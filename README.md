@@ -6,7 +6,7 @@ Pytorch implementation of the paper "**Efficient Progressive Image Compression w
 
 
 <div align="center">
-<img src="imgs/teaser.pdf" alt="teaser" width="400"/>
+<img src="imgs/teaser.png" alt="teaser" width="400"/>
 </div>
 
 ## Abstract
