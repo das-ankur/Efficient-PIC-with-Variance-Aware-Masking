@@ -1,7 +1,7 @@
 # Efficient Progressive Image Compression with Variance-aware Masking
 
 
-Pytorch implementation of the paper "**Efficient Progressive Image Compression with Variance-aware Masking**", accepted at ICIP 2025. This repository is based on [CompressAI](https://github.com/InterDigitalInc/CompressAI) and [STF](https://github.com/Googolxx/STF)
+Pytorch implementation of the paper "**Efficient Progressive Image Compression with Variance-aware Masking**", accepted at WACV 2025. This repository is based on [CompressAI](https://github.com/InterDigitalInc/CompressAI) and [STF](https://github.com/Googolxx/STF)
 
 
 
