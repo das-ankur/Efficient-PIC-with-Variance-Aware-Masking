@@ -17,3 +17,7 @@ image compression method in which an image is first represented as a pair of bas
 it into complementary components, which can be transmitted separately to the decoder in order to obtain different
 reconstruction quality. The masking system does not addfurther parameters nor complexity. At the receiver, any elements of the top latent representation excluded from the transmitted components can be independently replaced with the mean predicted by the hyperprior architecture, ensuring reliable reconstructions at any intermediate quality level. We also introduced Rate Enhancement Modules (REMs), which refine the estimation of entropy parameters using already decoded components. We obtain results competitive with state-of-the-art competitors, while significantly reducing computational complexity, decoding time, and number of parameters.
 
+
+## TODO
+
+The repository will be ready by February 2025 (WACV conference)
