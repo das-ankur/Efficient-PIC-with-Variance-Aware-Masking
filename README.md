@@ -7,7 +7,8 @@ Pytorch implementation of the paper "**Efficient Progressive Image Compression w
 
 <div align="center">
 <img src="imgs/teaser.png" alt="teaser" width="400"/>
-<p><em>Figura 1: Descrizione della tua immagine.</em></p>
+<p><em>Compression results for three different qualities, which increase across rows.
+  Adding details via the masking system (a) increases the standard deviation in the non-masked latent representation (b)  to add  details  (c) for a better reconstruction (d).</em></p>
 </div>
 
 ## Abstract
