@@ -1,5 +1,29 @@
 import torch
+import torch.nn as nn
 
+def ste_round(x):
+    return torch.round(x) - x.detach() + x
+
+
+def conv(in_channels, out_channels, kernel_size=5, stride=2):
+    return nn.Conv2d(
+        in_channels,
+        out_channels,
+        kernel_size=kernel_size,
+        stride=stride,
+        padding=kernel_size // 2,
+    )
+
+
+def deconv(in_channels, out_channels, kernel_size=5, stride=2):     # SN -1 + k - 2p
+    return nn.ConvTranspose2d(
+        in_channels,
+        out_channels,
+        kernel_size=kernel_size,
+        stride=stride,
+        output_padding=stride - 1,
+        padding=kernel_size // 2,
+    )
 
 def find_named_buffer(module, query):
     """Helper function to find a named buffer. Returns a `torch.Tensor` or `None`

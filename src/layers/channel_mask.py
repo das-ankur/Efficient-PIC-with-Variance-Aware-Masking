@@ -1,32 +1,19 @@
 
 import torch.nn as nn
 import torch 
+
+def ste_round(x):
+    return torch.round(x) - x.detach() + x
+
+
 class ChannelMask(nn.Module):
 
-    def __init__(self, 
-                 mask_policy, 
-                 scalable_levels,
-                 dim_chunk, 
-                 num_levels, 
-                 double_dim = False):
+    def __init__(self,mask_policy):
         super().__init__()
 
         self.mask_policy = mask_policy 
-        self.scalable_levels = scalable_levels 
-        self.quality_list = [i for i in range(self.scalable_levels)]
-        self.dim_chunk =dim_chunk 
-        self.num_levels = num_levels
-        self.double_dim = double_dim
+
         
-        if self.double_dim:
-            print("vado qua dove il double dim è raddoppiato!!!")
-            self.input_dim = self.dim_chunk*2
-        else: 
-            self.input_dim = self.dim_chunk
-
-       
-
-
 
     def delta_mask(self, scale,  pr_bar, pr):
         shapes = scale.shape
@@ -55,6 +42,15 @@ class ChannelMask(nn.Module):
             res_b = res_b.to(scale.device)
             res[j] = res_b             
 
+
+    def apply_noise(self, mask, tr):
+            if tr:
+                mask = ste_round(mask)
+            else:
+                mask = torch.round(mask)
+            return mask
+
+
     def forward(self,
                 scale,  
                 pr = 0, 
@@ -62,13 +58,15 @@ class ChannelMask(nn.Module):
                 cust_map = None):
 
         if cust_map is not None:
-            #cust_map = cust_map.unsqueeze(0).to(cust_map.device)
-            shapes = cust_map.shape
-            bs, ch, w,h = shapes
+
             if pr >= 10:
                 return torch.ones_like(cust_map).to(scale.device)
             elif pr == 0:
-                return torch.zeros_like(cust_map).to(scale.device)           
+                return torch.zeros_like(cust_map).to(scale.device)  
+            #cust_map = cust_map.unsqueeze(0).to(cust_map.device)
+            shapes = cust_map.shape
+            bs, ch, w,h = shapes
+         
             pr = 10 if pr > 10 else pr
             pr = pr*0.1
             pr_bis = 1.0 - pr
@@ -92,8 +90,6 @@ class ChannelMask(nn.Module):
         shapes = scale.shape
         bs, ch, w,h = shapes
 
-        if mask_pol is None: 
-            return torch.ones_like(scale).to(scale.device)
         if mask_pol == "point-based-std":
             if pr >= 10:
                 return torch.ones_like(scale).to(scale.device)
