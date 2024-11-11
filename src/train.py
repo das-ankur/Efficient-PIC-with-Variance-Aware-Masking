@@ -117,13 +117,10 @@ def main(argv):
 
     filelist = test_dataset.image_path
 
-    if args.lmbda_list == []:
-        lmbda_list = None
-    else:
-        lmbda_list = args.lmbda_list
 
 
-    net = get_model(args,device, lmbda_list)
+
+    net = get_model(args,device)
     net = net.to(device)
 
 
