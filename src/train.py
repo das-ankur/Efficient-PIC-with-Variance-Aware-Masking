@@ -158,7 +158,8 @@ def main(argv):
     
         print("----> ",bpp_init," ",psnr_init) 
 
-
+    print("done everything")
+    return 0
 
     for epoch in range(last_epoch, args.epochs):
         print("******************************************************")

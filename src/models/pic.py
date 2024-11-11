@@ -71,9 +71,8 @@ class VarianceMaskingPIC(CompressionModel):
         delta_dim = self.dimensions_M[1] - self.dimensions_M[0]
 
 
-        self.g_a = define_encoder(self.multiple_encoder,N,M,self.dimensions_M)
-        self.g_s = define_decoder(self.multiple_decoder,N,M,self.dimensions_M)
-
+        self.g_a = define_encoder(self.multiple_encoder,self.N,self.M,self.dimensions_M)
+        self.g_s = define_decoder(self.multiple_decoder,self.N,self.M,self.dimensions_M)
         self.h_a, self.h_mean_s, self.h_scale_s = define_hyperprior(self.multiple_hyperprior,
                                                                     self.M,
                                                                     self.N,
@@ -174,6 +173,39 @@ class VarianceMaskingPIC(CompressionModel):
             for i in range(self.g_s):
                 for n,p in self.g_s[i].named_parameters():
                     p.requires_grad = True
+
+
+    def print_information(self):
+        if self.multiple_encoder is False:
+            print(" g_a: ",sum(p.numel() for p in self.g_a.parameters()))
+        else:
+            print(" g_a: ",sum(p.numel() for p in self.g_a.parameters()))
+           
+        print(" h_a: ",sum(p.numel() for p in self.h_a.parameters()))
+        print(" h_means_a: ",sum(p.numel() for p in self.h_mean_s.parameters()))
+        print(" h_scale_a: ",sum(p.numel() for p in self.h_scale_s.parameters()))
+        print("cc_mean_transforms",sum(p.numel() for p in self.cc_mean_transforms.parameters()))
+        print("cc_scale_transforms",sum(p.numel() for p in self.cc_scale_transforms.parameters()))
+
+
+
+        print("cc_mean_transforms_prog",sum(p.numel() for p in self.cc_mean_transforms_prog.parameters()))
+        print("cc_scale_transforms_prog",sum(p.numel() for p in self.cc_scale_transforms_prog.parameters()))  
+
+        print("lrp_transform",sum(p.numel() for p in self.lrp_transforms.parameters()))
+        if self.multiple_decoder:
+            for i in range(2):
+                print("g_s_" + str(i) + ": ",sum(p.numel() for p in self.g_s[i].parameters()))
+        else: 
+            print("g_s",sum(p.numel() for p in self.g_s.parameters()))
+
+        print("**************************************************************************")
+        model_tr_parameters = sum(p.numel() for p in self.parameters() if p.requires_grad)
+        model_fr_parameters = sum(p.numel() for p in self.parameters() if p.requires_grad== False)
+        print(" trainable parameters: ",model_tr_parameters)
+        print(" freeze parameterss: ", model_fr_parameters)
+        return sum(p.numel() for p in self.parameters() if p.requires_grad)
+    
 
 
     def define_quality(self,quality):
