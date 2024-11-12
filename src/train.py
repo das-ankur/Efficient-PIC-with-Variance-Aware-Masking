@@ -122,7 +122,7 @@ def main(argv):
 
     net = get_model(args,device)
     net = net.to(device)
-    net.update()
+    #net.update()
 
 
     if args.checkpoint != "none":
@@ -151,12 +151,12 @@ def main(argv):
     if args.checkpoint != "none" and args.test_before:
         pr_list = [0,0.05,0.1,0.25,0.5,0.6,0.75,1,1.25,2,3,5,10] #ggg
         mask_pol = "point-based-std"
-    
+
         bpp_init, psnr_init,_ = compress_with_ac(net, #net 
                                             filelist, 
-                                            device,
-                                            pr_list =pr_list,  
-                                            mask_pol = mask_pol)
+                                           device,
+                                           pr_list =pr_list,  
+                                           mask_pol = mask_pol)
     
         print("----> ",bpp_init," ",psnr_init) 
 

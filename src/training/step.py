@@ -149,7 +149,7 @@ def valid_epoch(epoch, test_dataloader,criterion, model, pr_list = [0.05], wandb
 
 
 
-def test_epoch(epoch, test_dataloader, model, pr_list):
+def test_epoch(epoch, test_dataloader, model, pr_list, wandb_log = False):
     model.eval()
     device = next(model.parameters()).device
 
@@ -176,30 +176,30 @@ def test_epoch(epoch, test_dataloader, model, pr_list):
                 bpp_loss[j].update(bpp)
 
 
-
-    for i in range(len(pr_list)):
-        if i== 0:
-            name = "test_base"
-        elif i == len(pr_list) - 1:
-            name = "test_complete"
-        else:
-            c = str(pr_list[i])
-            name = "test_quality_" + c 
-        
-        log_dict = {
-            name:epoch,
-            name + "/bpp":bpp_loss[i].avg,
-            name + "/psnr":psnr[i].avg,
-            }
-
-        wandb.log(log_dict)
-
-        if "mutual" in list(out_net):
+    if wandb_log:
+        for i in range(len(pr_list)):
+            if i== 0:
+                name = "test_base"
+            elif i == len(pr_list) - 1:
+                name = "test_complete"
+            else:
+                c = str(pr_list[i])
+                name = "test_quality_" + c 
+            
             log_dict = {
                 name:epoch,
-                name + "/mutual":mutual_info[i].avg
+                name + "/bpp":bpp_loss[i].avg,
+                name + "/psnr":psnr[i].avg,
                 }
+
             wandb.log(log_dict)
+
+            if "mutual" in list(out_net):
+                log_dict = {
+                    name:epoch,
+                    name + "/mutual":mutual_info[i].avg
+                    }
+                wandb.log(log_dict)
 
     return [bpp_loss[i].avg for i in range(len(bpp_loss))], [psnr[i].avg for i in range(len(psnr))]
 
@@ -244,16 +244,11 @@ def compress_with_ac(model,
 
                 
 
-                data =  model.compress(x_padded, quality =p, 
-                                       mask_pol = mask_pol, cust_map = custom_map if p > 0 else None)
+                data =  model.compress(x_padded, quality =p, mask_pol = mask_pol,)
                 #if j%8==0:
                 #    print(sum(len(s[0]) for s in data["strings"][0]))
                 start = time.time()
-                out_dec = model.decompress(data["strings"], data["shape"], 
-                                                quality = p,
-                                                  mask_pol = mask_pol, 
-                                                  cust_map = custom_map if p > 0 else None,
-                                                )
+                out_dec = model.decompress(data["strings"], data["shape"], quality = p,mask_pol = mask_pol)
                 end = time.time()
                 #print("Runtime of the epoch:  ", epoch)
                 decoded_time = end-start

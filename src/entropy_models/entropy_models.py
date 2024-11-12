@@ -556,15 +556,7 @@ class EntropyBottleneck(EntropyModel):
 
 
 class GaussianConditional(EntropyModel):
-    r"""Gaussian conditional layer, introduced by J. Ballé, D. Minnen, S. Singh,
-    S. J. Hwang, N. Johnston, in `"Variational image compression with a scale
-    hyperprior" <https://arxiv.org/abs/1802.01436>`_.
 
-    This is a re-implementation of the Gaussian conditional layer in
-    *tensorflow/compression*. See the `tensorflow documentation
-    <https://tensorflow.github.io/compression/docs/api_docs/python/tfc/GaussianConditional.html>`__
-    for more information.
-    """
 
     def __init__(
         self,
@@ -575,7 +567,7 @@ class GaussianConditional(EntropyModel):
         **kwargs: Any,
     ):
         super().__init__(*args, **kwargs)
-
+        print("MAIOENTROQUA!!!!!!!!!!!!!!!!!!!!!!!!!!")
         if not isinstance(scale_table, (type(None), list, tuple)):
             raise ValueError(f'Invalid type for scale_table "{type(scale_table)}"')
 
@@ -617,18 +609,19 @@ class GaussianConditional(EntropyModel):
     def _standardized_quantile(quantile):
         return scipy.stats.norm.ppf(quantile)
 
-    def update_scale_table(self, scale_table, force=False):
+    def update_scale_table(self, scale_table):
         # Check if we need to update the gaussian conditional parameters, the
         # offsets are only computed and stored when the conditonal model is
         # updated.
-
+        print("ma qua ci entro prova miseria")
         device = self.scale_table.device
         self.scale_table = self._prepare_scale_table(scale_table).to(device)
-        self.update()
+        self.update(self.scale_table)
         return True
 
-    def update(self):
-        print("gauss due volte")
+    def update(self,scale_table):
+        print("Gauss due volte")
+        self.scale_table = self._prepare_scale_table(scale_table)
         multiplier = -self._standardized_quantile(self.tail_mass / 2)
         pmf_center = torch.ceil(self.scale_table * multiplier).int()
         pmf_length = 2 * pmf_center + 1
@@ -709,80 +702,4 @@ class GaussianConditional(EntropyModel):
     def _standardized_quantile(quantile):
         return scipy.stats.norm.ppf(quantile)
 
-    def update_scale_table(self, scale_table, force=False):
-        # Check if we need to update the gaussian conditional parameters, the
-        # offsets are only computed and stored when the conditonal model is
-        # updated.
 
-        device = self.scale_table.device
-        self.scale_table = self._prepare_scale_table(scale_table).to(device)
-        self.update()
-        return True
-
-    def update(self):
-        multiplier = -self._standardized_quantile(self.tail_mass / 2)
-        pmf_center = torch.ceil(self.scale_table * multiplier).int()
-        pmf_length = 2 * pmf_center + 1
-
-        max_length = torch.max(pmf_length).item()
-
-        device = pmf_center.device
-        samples = torch.abs(
-            torch.arange(max_length, device=device).int() - pmf_center[:, None]
-        )
-        # print(samples)
-        samples_scale = self.scale_table.unsqueeze(1)
-        samples = samples.float()
-        samples_scale = samples_scale.float()
-        upper = self._standardized_cumulative((0.5 - samples) / samples_scale)
-        lower = self._standardized_cumulative((-0.5 - samples) / samples_scale)
-        pmf = upper - lower
-
-        tail_mass = 2 * lower[:, :1]
-
-        quantized_cdf = torch.Tensor(len(pmf_length), max_length + 2)
-        quantized_cdf = self._pmf_to_cdf(pmf, tail_mass, pmf_length, max_length)
-        self._quantized_cdf = quantized_cdf
-        self._offset = -pmf_center
-        self._cdf_length = pmf_length + 2
-
-    def _likelihood(self, inputs: Tensor, scales: Tensor, means: Optional[Tensor] = None) -> Tensor:
-        half = float(0.5)
-
-        if means is not None:
-            values = inputs - means
-        else:
-            values = inputs
-
-        scales = self.lower_bound_scale(scales)
-
-        values = torch.abs(values)
-        upper = self._standardized_cumulative((half - values) / scales)
-        lower = self._standardized_cumulative((-half - values) / scales)
-        likelihood = upper - lower
-
-        return likelihood
-
-    def forward(
-        self,
-        inputs: Tensor,
-        scales: Tensor,
-        means: Optional[Tensor] = None,
-        training: Optional[bool] = None,
-        mask: Optional[Tensor] = None
-    ) -> Tuple[Tensor, Tensor]:
-        if training is None:
-            training = self.training
-        outputs = self.quantize(inputs, "noise" if training else "dequantize", means, mask = mask)
-        likelihood = self._likelihood(outputs, scales, means)
-        if self.use_likelihood_bound:
-            likelihood = self.likelihood_lower_bound(likelihood)
-
-        return outputs, likelihood
-
-    def build_indexes(self, scales: Tensor) -> Tensor:
-        scales = self.lower_bound_scale(scales)
-        indexes = scales.new_full(scales.size(), len(self.scale_table) - 1).int()
-        for s in self.scale_table[:-1]:
-            indexes -= (scales <= s).int()
-        return indexes

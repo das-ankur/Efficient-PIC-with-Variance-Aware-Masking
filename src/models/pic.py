@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch 
 import math
 from layers import ChannelMask
-from .utils import conv, ste_round
+from .utils import conv, ste_round, update_registered_buffers
 from .base import CompressionModel
 from .builder import define_encoder, define_hyperprior, define_decoder
 
@@ -56,6 +56,8 @@ class VarianceMaskingPIC(CompressionModel):
         self.mask_policy = mask_policy
 
         self.quality_list = [0,10]
+
+        self.max_support_slices = 5
         
 
         self.entropy_bottleneck = EntropyBottleneck(self.N)
@@ -206,6 +208,25 @@ class VarianceMaskingPIC(CompressionModel):
         print(" freeze parameterss: ", model_fr_parameters)
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
     
+    def update(self, scale_table=None, force=True):
+        print("ouuuuuuuuuuuuuuuuuuuuuuuuu")
+        if scale_table is None:
+            scale_table = get_scale_table()
+        updated = self.gaussian_conditional.update_scale_table(scale_table)
+        updated = self.gaussian_conditional.update(scale_table)
+        updated = super().update(force=force)
+        return updated
+
+
+    def load_state_dict(self, state_dict, strict = True):
+        update_registered_buffers(
+            self.gaussian_conditional,
+            "gaussian_conditional",
+            ["_quantized_cdf", "_offset", "_cdf_length", "scale_table"],
+            state_dict,
+        )
+        super().load_state_dict(state_dict, strict = strict)
+
 
 
     def define_quality(self,quality):
@@ -408,7 +429,7 @@ class VarianceMaskingPIC(CompressionModel):
                 lrp = 0.5 * torch.tanh(lrp)
                 y_hat_slice += lrp   
 
-                y_hat_slice = self.merge(y_hat_slice,y_hat_slices_base[current_index],current_index)
+                y_hat_slice = self.merge(y_hat_slice,y_hat_slices_base[current_index])
  
                 y_hat_slices_quality.append(y_hat_slice)
                 #y_hat_slices_only_quality.append(y_hat_slice)
@@ -469,7 +490,7 @@ class VarianceMaskingPIC(CompressionModel):
             y_enh = self.g_a[1](x)
             y = torch.cat([y_base,y_enh],dim = 1).to(x.device) #dddd
         y_shape = y.shape[2:]
-        latent_means, latent_scales, z_likelihoods = self.compute_hyperprior(y, quality, not_force =  True)
+        latent_means, latent_scales, z_likelihoods = self.compute_hyperprior(y, quality)
 
         y_slices = y.chunk(self.num_slices, 1) # total amount of slicesy,
 
@@ -592,8 +613,6 @@ class VarianceMaskingPIC(CompressionModel):
 
             y_likelihood_quality.append(y_slice_likelihood)
 
-            if self.residual_before_lrp:
-                y_hat_slice = self.merge(y_hat_slice,y_hat_slices[current_index],current_index)
 
 
             lrp_support = torch.cat([mean_support,y_hat_slice], dim=1)
@@ -601,9 +620,8 @@ class VarianceMaskingPIC(CompressionModel):
             lrp = 0.5 * torch.tanh(lrp)
             y_hat_slice += lrp   
 
-            # faccio il merge qua!!!!!
-            if self.residual_before_lrp is False:
-                y_hat_slice = self.merge(y_hat_slice,y_hat_slices[current_index],current_index)   #ddd
+
+            y_hat_slice = self.merge(y_hat_slice,y_hat_slices[current_index])   #ddd
 
             y_hat_slices_quality.append(y_hat_slice)    
 
@@ -783,7 +801,7 @@ class VarianceMaskingPIC(CompressionModel):
             y_hat_slice += lrp
 
 
-            y_hat_slice = self.merge(y_hat_slice,y_hat_slices[current_index],current_index)
+            y_hat_slice = self.merge(y_hat_slice,y_hat_slices[current_index])
 
             y_hat_slices_quality.append(y_hat_slice)
 
@@ -876,8 +894,8 @@ class VarianceMaskingPIC(CompressionModel):
                                                          )
                               
                 
-            mean_support = torch.cat([latent_means[:,self.dimensions_M[0]:]] + support_slices_mean, dim=1)
-            scale_support = torch.cat([latent_scales[:,self.dimensions_M[0]:]] + support_slices_std, dim=1) 
+            mean_support = torch.cat([latent_means[:,self.division_dimension[0]:]] + support_slices_mean, dim=1)
+            scale_support = torch.cat([latent_scales[:,self.division_dimension[0]:]] + support_slices_std, dim=1) 
 
             
             mu = self.cc_mean_transforms_prog[current_index](mean_support)  #self.extract_mu(idx,slice_index,mean_support)
@@ -912,7 +930,7 @@ class VarianceMaskingPIC(CompressionModel):
 
             
 
-            y_hat_slice = self.merge(y_hat_slice,y_hat_slices[current_index],current_index)
+            y_hat_slice = self.merge(y_hat_slice,y_hat_slices[current_index])
 
             y_hat_slices_quality.append(y_hat_slice)
 

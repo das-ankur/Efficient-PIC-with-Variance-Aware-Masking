@@ -3,7 +3,8 @@ import torch
 import torch.nn as nn
 
 from compressai.ans import BufferedRansEncoder, RansDecoder
-from compressai.entropy_models import EntropyBottleneck, GaussianConditional
+from compressai.entropy_models import EntropyBottleneck
+from entropy_models import  GaussianConditional
 
 from .utils import conv, deconv, update_registered_buffers, ste_round
 
@@ -132,7 +133,7 @@ class WACNN(CompressionModel):
         self.gaussian_conditional = GaussianConditional(None)
 
 
-    def update(self, scale_table=None, force=False):
+    def update(self, scale_table=None, force=True):
         if scale_table is None:
             scale_table = get_scale_table()
         updated = self.gaussian_conditional.update_scale_table(scale_table, force=force)
@@ -208,6 +209,17 @@ class WACNN(CompressionModel):
         net = cls(192, 320)
         net.load_state_dict(state_dict)
         return net
+
+
+    def update(self, scale_table=None, force=False):
+        if scale_table is None:
+            scale_table = get_scale_table()
+        updated = self.gaussian_conditional.update_scale_table(scale_table, force=True)
+        updated |= super().update(force=force)
+        return updated
+
+
+
 
     def compress(self, x):
         y = self.g_a(x)
