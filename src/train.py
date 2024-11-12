@@ -4,13 +4,13 @@ import torch
 import time 
 import math 
 import torch.optim as optim
-from utility import parse_args, tri_planet_23_psnr, tri_planet_23_bpp, tri_planet_22_bpp, tri_planet_22_psnr, plot_rate_distorsion, create_savepath
+from utility import parse_args, tri_planet_23_psnr, tri_planet_23_bpp, tri_planet_22_bpp, tri_planet_22_psnr, plot_rate_distorsion, create_savepath, sec_to_hours
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from dataset import ImageFolder, TestKodakDataset
 from models import get_model
 from training import ScalableRateDistortionLoss
-from training import compress_with_ac, train_one_epoch, valid_epoch, test_epoch, sec_to_hours
+from training import compress_with_ac, train_one_epoch, valid_epoch, test_epoch
 import os
 import sys
 
@@ -70,7 +70,7 @@ def main(argv):
 
 
     train_path =  args.training_dataset
-    test_path = args.test_path
+    test_path = args.test_dataset
     save_path = args.save_path
     device = "cuda"
 
@@ -122,9 +122,11 @@ def main(argv):
 
     net = get_model(args,device)
     net = net.to(device)
+    net.update()
 
 
-    if args.checkpoint is not "none":
+    if args.checkpoint != "none":
+        print("entro in checkpoint")
         checkpoint = torch.load(args.checkpoint, map_location=device)
         net.load_state_dict(checkpoint["state_dict"],strict = True)
 

@@ -1,5 +1,5 @@
 import torch.nn as nn 
-from compress.layers import conv, GDN, Win_noShift_Attention, conv3x3, subpel_conv3x3, deconv
+from layers import conv, GDN, Win_noShift_Attention, conv3x3, subpel_conv3x3, deconv
 
 def define_decoder(multiple_decoder,N,M,dimensions_M):
         if multiple_decoder:

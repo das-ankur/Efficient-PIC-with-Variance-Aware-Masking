@@ -12,7 +12,7 @@ def parse_args(argv):
 
     parser.add_argument("--clip_max_norm",default=1.0,type=float,help="gradient clipping max norm (default: %(default)s",)
     parser.add_argument("--code", type=str, default = "0001", help="Batch size (default: %(default)s)")
-    parser.add_argument("--checkpoint", type=str, default = "none") #dddd
+    parser.add_argument("--checkpoint", type=str, default = "/scratch/ResDSIC/demo/l2_train/2l_memdmh_mem5/_very_best.pth.tar") #dddd
     parser.add_argument("--cuda", action="store_true", help="Use cuda")
 
     parser.add_argument("--division_dimension", nargs='+', type=int, default = [320, 640])
@@ -46,7 +46,7 @@ def parse_args(argv):
     
 
 
-
+    parser.add_argument("--save_path",  type=str, default = "/scratch/WACV/models", help="test path")
     parser.add_argument("--save_images", type=str, default = "none", help = "save compressed images") #dddd
     parser.add_argument("--seed", type=float, help="Set random seed for reproducibility")
     parser.add_argument("--sampling_training", action="store_true", help="Save model to disk")
@@ -55,6 +55,8 @@ def parse_args(argv):
     parser.add_argument("--total_mu_rep", action="store_true", help="use entire mu as input")
     parser.add_argument("--test_batch_size", type=int, default=1, help="Test batch size (default: %(default)s)", )
     parser.add_argument("--test_before", action="store_true", help="test before start training")
+    parser.add_argument("--training_dataset",  type=str, default = "/scratch/dataset/openimages", help="project name for wandb")
+    parser.add_argument("--test_dataset",  type=str, default = "/scratch/dataset/kodak", help="test path")
 
     parser.add_argument("--valid_batch_size",type=int,default=16,help="Test batch size (default: %(default)s)",)
 

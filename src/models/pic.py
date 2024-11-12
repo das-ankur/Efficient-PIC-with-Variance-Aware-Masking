@@ -48,7 +48,7 @@ class VarianceMaskingPIC(CompressionModel):
         self.multiple_decoder = multiple_decoder
         self.multiple_hyperprior = multiple_hyperprior
         self.division_channel = division_dimension[0]
-        self.dimensions_M = division_dimension
+        self.division_dimension = division_dimension
         self.support_progressive_slices = support_progressive_slices
         self.delta_encode = delta_encode
         self.total_mu_rep = total_mu_rep 
@@ -62,21 +62,21 @@ class VarianceMaskingPIC(CompressionModel):
         self.gaussian_conditional = GaussianConditional(None) #dddd
 
         self.masking = ChannelMask(self.mask_policy)
-        self.num_slice_cumulative_list = [p//self.dim_chunk for p in self.dimensions_M]
+        self.num_slice_cumulative_list = [p//self.dim_chunk for p in self.division_dimension]
         self.ns0 = self.num_slice_cumulative_list[0] 
         self.ns1 = self.num_slice_cumulative_list[1] 
 
 
         estremo_indice = self.support_progressive_slices + 1
-        delta_dim = self.dimensions_M[1] - self.dimensions_M[0]
+        delta_dim = self.division_dimension[1] - self.division_dimension[0]
 
 
-        self.g_a = define_encoder(self.multiple_encoder,self.N,self.M,self.dimensions_M)
-        self.g_s = define_decoder(self.multiple_decoder,self.N,self.M,self.dimensions_M)
+        self.g_a = define_encoder(self.multiple_encoder,self.N,self.M,self.division_dimension)
+        self.g_s = define_decoder(self.multiple_decoder,self.N,self.M,self.division_dimension)
         self.h_a, self.h_mean_s, self.h_scale_s = define_hyperprior(self.multiple_hyperprior,
                                                                     self.M,
                                                                     self.N,
-                                                                    self.dimensions_M)
+                                                                    self.division_dimension)
 
         self.cc_mean_transforms = nn.ModuleList(
                 nn.Sequential(
@@ -295,8 +295,8 @@ class VarianceMaskingPIC(CompressionModel):
             support_slices = (y_hat_slices_base if self.max_support_slices < 0 \
                                                         else y_hat_slices_base[:indice])               
             
-            mean_support = torch.cat([latent_means[:,:self.dimensions_M[0]]] + support_slices, dim=1)
-            scale_support = torch.cat([latent_scales[:,:self.dimensions_M[0]]] + support_slices, dim=1) 
+            mean_support = torch.cat([latent_means[:,:self.division_dimension[0]]] + support_slices, dim=1)
+            scale_support = torch.cat([latent_scales[:,:self.division_dimension[0]]] + support_slices, dim=1) 
 
             
             mu = self.cc_mean_transforms[idx](mean_support)  #self.extract_mu(idx,slice_index,mean_support)
@@ -368,8 +368,8 @@ class VarianceMaskingPIC(CompressionModel):
                 support_slices_std = self.determine_support(y_hat_slices_base,current_index,support_vector_std)
                               
                 
-                mean_support = torch.cat([latent_means[:,self.dimensions_M[0]:]] + support_slices_mean, dim=1)
-                scale_support = torch.cat([latent_scales[:,self.dimensions_M[0]:]] + support_slices_std, dim=1) 
+                mean_support = torch.cat([latent_means[:,self.division_dimension[0]:]] + support_slices_mean, dim=1)
+                scale_support = torch.cat([latent_scales[:,self.division_dimension[0]:]] + support_slices_std, dim=1) 
 
             
                 mu = self.cc_mean_transforms_prog[current_index](mean_support)  #self.extract_mu(idx,slice_index,mean_support)
@@ -557,8 +557,8 @@ class VarianceMaskingPIC(CompressionModel):
                                                          )
                               
                 
-            mean_support = torch.cat([latent_means[:,self.dimensions_M[0]:]] + support_slices_mean, dim=1)
-            scale_support = torch.cat([latent_scales[:,self.dimensions_M[0]:]] + support_slices_std, dim=1) 
+            mean_support = torch.cat([latent_means[:,self.division_dimension[0]:]] + support_slices_mean, dim=1)
+            scale_support = torch.cat([latent_scales[:,self.division_dimension[0]:]] + support_slices_std, dim=1) 
 
             
             mu = self.cc_mean_transforms_prog[current_index](mean_support)  #self.extract_mu(idx,slice_index,mean_support)
@@ -742,8 +742,8 @@ class VarianceMaskingPIC(CompressionModel):
                                                          )
                               
                 
-            mean_support = torch.cat([latent_means[:,self.dimensions_M[0]:]] + support_slices_mean, dim=1)
-            scale_support = torch.cat([latent_scales[:,self.dimensions_M[0]:]] + support_slices_std, dim=1) 
+            mean_support = torch.cat([latent_means[:,self.division_dimension[0]:]] + support_slices_mean, dim=1)
+            scale_support = torch.cat([latent_scales[:,self.division_dimension[0]:]] + support_slices_std, dim=1) 
 
             
             mu = self.cc_mean_transforms_prog[current_index](mean_support)  #self.extract_mu(idx,slice_index,mean_support)
@@ -788,3 +788,137 @@ class VarianceMaskingPIC(CompressionModel):
             y_hat_slices_quality.append(y_hat_slice)
 
         return {"strings": [y_strings, z_strings],"shape":z.size()[-2:],"masks":masks}
+    
+
+
+
+    def decompress(self, strings, shape, quality, mask_pol = None):
+
+
+        mask_pol = self.mask_policy if mask_pol is None else mask_pol
+
+        z_hat = self.entropy_bottleneck.decompress(strings[1], shape)
+        latent_scales_base = self.h_scale_s(z_hat) if self.multiple_hyperprior is False else self.h_scale_s[0](z_hat)
+        latent_means_base = self.h_mean_s(z_hat) if self.multiple_hyperprior is False else self.h_mean_s[0](z_hat)
+
+        
+        if self.multiple_hyperprior is False or quality == 0:
+            latent_scales = latent_scales_base #torch.zeros_like(latent_scales_base).to(latent_scales_base.device) 
+            latent_means = latent_means_base #torch.zeros_like(latent_means_base).to(latent_means_base.device) 
+        else:
+            latent_scales_enh = self.h_scale_s[1](z_hat) 
+            latent_means_enh = self.h_mean_s[1](z_hat)
+            latent_means = torch.cat([latent_means_base,latent_means_enh],dim = 1)
+            latent_scales = torch.cat([latent_scales_base,latent_scales_enh],dim = 1) 
+
+        y_shape = [z_hat.shape[2] * 4, z_hat.shape[3] * 4]
+        y_string = strings[0]
+        y_hat_slices = []
+
+        scales_baseline = []
+        for slice_index in range(self.num_slice_cumulative_list[0]): #ddd
+            pr_strings = y_string[slice_index]
+            idx = slice_index%self.num_slice_cumulative_list[0]
+            indice = min(self.max_support_slices,idx)
+            support_slices = (y_hat_slices if self.max_support_slices < 0 else y_hat_slices[:indice]) 
+            
+            mean_support = torch.cat([latent_means[:,:self.division_dimension[0]]] + support_slices, dim=1)
+            scale_support = torch.cat([latent_scales[:,:self.division_dimension[0]]] + support_slices, dim=1) 
+
+            
+            mu = self.cc_mean_transforms[idx](mean_support)  #self.extract_mu(idx,slice_index,mean_support)
+            mu = mu[:, :, :y_shape[0], :y_shape[1]]  
+            scale = self.cc_scale_transforms[idx](scale_support)#self.extract_scale(idx,slice_index,scale_support)
+            scale = scale[:, :, :y_shape[0], :y_shape[1]]
+
+            scales_baseline.append(scale)
+
+            index = self.gaussian_conditional.build_indexes(scale)
+
+
+            rv = self.gaussian_conditional.decompress(pr_strings, index )
+            rv = rv.reshape(mu.shape)
+            y_hat_slice = self.gaussian_conditional.dequantize(rv, mu)
+
+            lrp_support = torch.cat([mean_support, y_hat_slice], dim=1)
+            lrp = self.lrp_transforms[idx](lrp_support)
+            lrp = 0.5 * torch.tanh(lrp)
+            y_hat_slice += lrp
+
+            #if quality == 0 or slice_index <self.num_slice_cumulative_list[0]:
+            y_hat_slices.append(y_hat_slice)
+            #else:
+            #    y_hat_slices_enh.append(y_hat_slice)
+        if quality == 0:
+            y_hat_b = torch.cat(y_hat_slices, dim=1)
+            x_hat = self.g_s[0](y_hat_b).clamp_(0, 1) if self.multiple_decoder else self.g_s(y_hat_b).clamp_(0, 1)
+
+
+            return {"x_hat": x_hat}
+
+        y_hat_slices_quality = []
+        mu_total = []
+        std_total = []
+        for slice_index in range(self.ns0,self.ns1):
+            pr_strings = y_string[slice_index]
+            current_index = slice_index%self.ns0
+
+
+            support_vector = mu_total if self.all_scalable else y_hat_slices_quality
+            support_vector_std = std_total if self.all_scalable else y_hat_slices_quality
+            support_slices_mean = self.determine_support(y_hat_slices,
+                                                         current_index,
+                                                        support_vector                                                      
+                                                         )
+            support_slices_std = self.determine_support(y_hat_slices,
+                                                         current_index,
+                                                        support_vector_std                                                      
+                                                         )
+                              
+                
+            mean_support = torch.cat([latent_means[:,self.dimensions_M[0]:]] + support_slices_mean, dim=1)
+            scale_support = torch.cat([latent_scales[:,self.dimensions_M[0]:]] + support_slices_std, dim=1) 
+
+            
+            mu = self.cc_mean_transforms_prog[current_index](mean_support)  #self.extract_mu(idx,slice_index,mean_support)
+            mut = mu + y_hat_slices[current_index] if self.total_mu_rep else mu
+            mu = mu[:, :, :y_shape[0], :y_shape[1]]  
+                
+
+
+            scale = self.cc_scale_transforms_prog[current_index](scale_support)#self.extract_scale(idx,slice_index,scale_support)
+            std_total.append(scale)
+
+            mu_total.append(mut)
+
+
+            scale = scale[:, :, :y_shape[0], :y_shape[1]]
+
+            
+            
+            block_mask = self.masking(scale,pr = quality,mask_pol = mask_pol) 
+
+
+            index = self.gaussian_conditional.build_indexes(scale*block_mask)
+            rv = self.gaussian_conditional.decompress(pr_strings, index)
+            rv = rv.reshape(mu.shape)
+            y_hat_slice = self.gaussian_conditional.dequantize(rv, mu)
+
+
+            lrp_support = torch.cat([mean_support, y_hat_slice], dim=1)
+            lrp = self.lrp_transforms_prog[current_index](lrp_support)
+            lrp = 0.5 * torch.tanh(lrp)
+            y_hat_slice += lrp
+
+            
+
+            y_hat_slice = self.merge(y_hat_slice,y_hat_slices[current_index],current_index)
+
+            y_hat_slices_quality.append(y_hat_slice)
+
+        y_hat_en = torch.cat(y_hat_slices_quality,dim = 1)
+        if self.multiple_decoder:
+            x_hat = self.g_s[1](y_hat_en).clamp_(0, 1)
+        else:
+            x_hat = self.g_s(y_hat_en).clamp_(0, 1) 
+        return {"x_hat": x_hat}   
