@@ -49,11 +49,64 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
 
 
         self.post_latent = nn.ModuleList(
-                                nn.ModuleList( LatentRateReduction(dim_chunk = self.base_net.dim_chunk,
+                                nn.ModuleList( LatentRateReduction(dim_chunk = self.dim_chunk,
                                             mu_std = self.mu_std, dimension=dimension) 
                                             for _ in range(10))
                                 for _ in range(self.check_multiple)
                                 )
+
+
+    def load_state_dict(self, state_dict, strict=True):
+        # Carica i parametri del modello padre
+        parent_state_dict = {k: v for k, v in state_dict.items() if k in self.state_dict() and 'post_latent' not in k}
+        super().load_state_dict(parent_state_dict, strict=False)
+        
+        # Carica i parametri di post_latent se presenti
+        post_latent_state_dict = {k: v for k, v in state_dict.items() if 'post_latent' in k}
+        if post_latent_state_dict:
+            print("I am downloading a model with REMS")
+            self.post_latent.load_state_dict(post_latent_state_dict, strict=True)
+        else:
+            print("This model does not have trained REMs.  self.enable_rem will be set to False")
+            self.enable_rem = False
+
+
+    def print_information(self):
+
+        if self.multiple_encoder is False:
+            print(" g_a: ",sum(p.numel() for p in self.g_a.parameters()))
+        else:
+            print(" g_a: ",sum(p.numel() for p in self.g_a.parameters()))
+           
+        print(" h_a: ",sum(p.numel() for p in self.h_a.parameters()))
+        print(" h_means_a: ",sum(p.numel() for p in self.h_mean_s.parameters()))
+        print(" h_scale_a: ",sum(p.numel() for p in self.h_scale_s.parameters()))
+        print("cc_mean_transforms",sum(p.numel() for p in self.cc_mean_transforms.parameters()))
+        print("cc_scale_transforms",sum(p.numel() for p in self.cc_scale_transforms.parameters()))
+
+
+
+        print("cc_mean_transforms_prog",sum(p.numel() for p in self.cc_mean_transforms_prog.parameters()))
+        print("cc_scale_transforms_prog",sum(p.numel() for p in self.cc_scale_transforms_prog.parameters()))  
+
+        print("lrp_transform",sum(p.numel() for p in self.lrp_transforms.parameters()))
+        if self.multiple_decoder:
+            for i in range(2):
+                print("g_s_" + str(i) + ": ",sum(p.numel() for p in self.g_s[i].parameters()))
+        else: 
+            print("g_s",sum(p.numel() for p in self.g_s.parameters()))
+        print("post net",sum(p.numel() for p in self.post_latent.parameters())) 
+        print("post trainable net",sum(p.numel() for p in self.post_latent.parameters() if p.requires_grad is True)) 
+        print("**************************************************************************")
+        model_tr_parameters = sum(p.numel() for p in self.parameters() if p.requires_grad)
+        model_fr_parameters = sum(p.numel() for p in self.parameters() if p.requires_grad== False)
+        print(" trainable parameters: ",model_tr_parameters)
+        print(" freeze parameterss: ", model_fr_parameters)
+
+        return sum(p.numel() for p in self.parameters() if p.requires_grad)
+
+
+
 
 
 
@@ -166,12 +219,12 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
         mask_pol = self.mask_policy if mask_pol is None else mask_pol
 
         if self.multiple_encoder is False:
-            y = self.base_net.g_a(x)
+            y = self.g_a(x)
             y_base = y 
             y_enh = y
         else:
-            y_base = self.base_net.g_a[0](x)
-            y_enh = self.base_net.g_a[1](x)
+            y_base = self.g_a[0](x)
+            y_enh = self.g_a[1](x)
             y = torch.cat([y_base,y_enh],dim = 1).to(x.device) #dddd
 
         y_shape = y.shape[2:]
@@ -262,14 +315,14 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
                                                         support_vector_std                                                      
                                                          )
 
-            mean_support = torch.cat([latent_means[:,self.base_net.dimensions_M[0]:]] + support_slices_mean, dim=1)
-            scale_support = torch.cat([latent_scales[:,self.base_net.dimensions_M[0]:]] + support_slices_std, dim=1) 
+            mean_support = torch.cat([latent_means[:,self.division_dimension[0]:]] + support_slices_mean, dim=1)
+            scale_support = torch.cat([latent_scales[:,self.division_dimension[0]:]] + support_slices_std, dim=1) 
 
-            mu = self.base_net.cc_mean_transforms_prog[current_index](mean_support)  #self.extract_mu(idx,slice_index,mean_support)
-            mut = mu + y_hat_slices[current_index] if self.base_net.total_mu_rep else mu
+            mu = self.cc_mean_transforms_prog[current_index](mean_support)  #self.extract_mu(idx,slice_index,mean_support)
+            mut = mu + y_hat_slices[current_index] if self.total_mu_rep else mu
             mu = mu[:, :, :y_shape[0], :y_shape[1]]  
 
-            scale = self.base_net.cc_scale_transforms_prog[current_index](scale_support)#self.extract_scale(idx,slice_index,scale_support)
+            scale = self.cc_scale_transforms_prog[current_index](scale_support)#self.extract_scale(idx,slice_index,scale_support)
             
 
             mu_prog[current_index] = mu_prog[current_index] + mu
@@ -311,7 +364,7 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
             
 
             y_slice_m = (y_slice  - mu)*block_mask
-            _, y_slice_likelihood = self.base_net.gaussian_conditional(y_slice_m, scale*block_mask, training = training)
+            _, y_slice_likelihood = self.gaussian_conditional(y_slice_m, scale*block_mask, training = training)
             y_hat_slice = ste_round(y_slice - mu)*block_mask + mu
 
 
@@ -335,8 +388,8 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
         std_prog = torch.cat(std_prog, dim = 1)#kkkk
 
         index = 0 if quality == 0 else 1
-        x_hat = self.base_net.g_s[index](y_hat).clamp_(0, 1) if self.base_net.multiple_decoder  \
-                else self.base_net.g_s(y_hat).clamp_(0, 1)
+        x_hat = self.g_s[index](y_hat).clamp_(0, 1) if self.multiple_decoder  \
+                else self.g_s(y_hat).clamp_(0, 1)
 
         return {
             "x_hat":x_hat,
@@ -350,10 +403,10 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
                 quality = 0.0, 
                 mask_pol = "point-based-std", 
                 checkpoint_rep = None, 
-                real_compress = True, 
-                used_qual = None):
+                real_compress = True 
+                ):
 
-        used_qual = self.check_levels if used_qual is None else used_qual
+        #used_qual = self.check_levels if used_qual is None else used_qual
 
 
         if self.multiple_encoder is False:
@@ -416,7 +469,8 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
             index = self.gaussian_conditional.build_indexes(scale)
             if real_compress:
                 y_q_string  = self.gaussian_conditional.compress(y_slice, index,mu)
-                y_hat_slice = self.gaussian_conditional.decompress(y_q_string, index)
+                y_hat_slice = self.gaussian_conditional.decompress(y_q_string, index).to(mu.device)
+                #print(y_hat_slice.device,"  ",mu.device)
                 y_hat_slice = y_hat_slice + mu
             else:
                 y_q_string  = self.gaussian_conditional.quantize(y_slice, "symbols", mu)#ddd
@@ -470,8 +524,8 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
 
 
             
-            mean_support = torch.cat([latent_means[:,self.dimensions_M[0]:]] + support_slices_mean, dim=1)
-            scale_support = torch.cat([latent_scales[:,self.dimensions_M[0]:]] + support_slices_std, dim=1) 
+            mean_support = torch.cat([latent_means[:,self.division_dimension[0]:]] + support_slices_mean, dim=1)
+            scale_support = torch.cat([latent_scales[:,self.division_dimension[0]:]] + support_slices_std, dim=1) 
 
             mu = self.cc_mean_transforms_prog[current_index](mean_support)  #self.extract_mu(idx,slice_index,mean_support)
             mut = mu + y_hat_slices[current_index] if self.total_mu_rep else mu
@@ -516,19 +570,19 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
             index = self.gaussian_conditional.build_indexes(scale*block_mask).int()
             if real_compress:
 
-                y_q_string  = self.base_net.gaussian_conditional.compress((y_slice - mu)*block_mask, index)
+                y_q_string  = self.gaussian_conditional.compress((y_slice - mu)*block_mask, index)
                 y_strings.append(y_q_string)
-                y_hat_slice_nomu = self.base_net.gaussian_conditional.quantize((y_slice - mu)*block_mask, "dequantize") 
+                y_hat_slice_nomu = self.gaussian_conditional.quantize((y_slice - mu)*block_mask, "dequantize") 
                 y_hat_slice = y_hat_slice_nomu + mu
             else:
-                y_q_string  = self.base_net.gaussian_conditional.quantize((y_slice - mu)*block_mask, "dequantize") 
+                y_q_string  = self.gaussian_conditional.quantize((y_slice - mu)*block_mask, "dequantize") 
                 y_strings.append(y_q_string)
                 y_hat_slice = y_q_string + mu
 
 
 
             lrp_support = torch.cat([mean_support,y_hat_slice], dim=1)
-            lrp = self.base_net.lrp_transforms_prog[current_index](lrp_support) #ddd
+            lrp = self.lrp_transforms_prog[current_index](lrp_support) #ddd
             lrp = 0.5 * torch.tanh(lrp)
             y_hat_slice += lrp
 
@@ -548,7 +602,7 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
         
 
 
-        mask_pol = self.base_net.mask_policy if mask_pol is None else mask_pol
+        mask_pol = self.mask_policy if mask_pol is None else mask_pol
 
 
         start_t = time.time()
@@ -648,8 +702,8 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
 
 
             
-            mean_support = torch.cat([latent_means[:,self.dimensions_M[0]:]] + support_slices_mean, dim=1)
-            scale_support = torch.cat([latent_scales[:,self.dimensions_M[0]:]] + support_slices_std, dim=1) 
+            mean_support = torch.cat([latent_means[:,self.division_dimension[0]:]] + support_slices_mean, dim=1)
+            scale_support = torch.cat([latent_scales[:,self.division_dimension[0]:]] + support_slices_std, dim=1) 
 
             mu = self.cc_mean_transforms_prog[current_index](mean_support)  #self.extract_mu(idx,slice_index,mean_support)
             mut = mu + y_hat_slices[current_index] if self.total_mu_rep else mu
@@ -697,8 +751,8 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
  
 
 
-            index = self.base_net.gaussian_conditional.build_indexes(scale*block_mask)
-            rv = self.base_net.gaussian_conditional.decompress(pr_strings, index)
+            index = self.gaussian_conditional.build_indexes(scale*block_mask)
+            rv = self.gaussian_conditional.decompress(pr_strings, index).to(mu.device)
             rv = rv.reshape(mu.shape)
 
             y_hat_slice = rv + mu
@@ -719,7 +773,7 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
         time_ = end_t - start_t
 
         if self.multiple_decoder:
-            x_hat = self.base_net.g_s[1](y_hat_en).clamp_(0, 1)
+            x_hat = self.g_s[1](y_hat_en).clamp_(0, 1)
         else:
             x_hat = self.g_s(y_hat_en).clamp_(0, 1) 
         return {"x_hat": x_hat,"y_hat":y_hat_en,"time":time_}          

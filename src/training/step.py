@@ -226,7 +226,6 @@ def compress_with_ac(model,
 
     for i,d in enumerate(filelist):
         print("l'immagine d: ",d," ",i)
-        custom_map = None 
 
         with torch.no_grad():
             x = read_image(d).to(device)

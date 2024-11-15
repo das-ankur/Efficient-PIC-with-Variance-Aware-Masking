@@ -14,10 +14,12 @@ def parse_args(argv):
     parser.add_argument("--code", type=str, default = "0001", help="Batch size (default: %(default)s)")
     parser.add_argument("--checkpoint", type=str, default = "/scratch/ResDSIC/demo/l2_train/2l_memdmh_mem5/_very_best.pth.tar") #dddd
     parser.add_argument("--cuda", action="store_true", help="Use cuda")
+    parser.add_argument("--check_levels", nargs='+', type=int, default = [0.05, 0.75, 2])
 
     parser.add_argument("--division_dimension", nargs='+', type=int, default = [320, 640])
     parser.add_argument( "--dim_chunk", type=int, default=32, help="dim chunk")
     parser.add_argument("--delta_encode", action="store_true", help="delta encoder")
+    parser.add_argument("--dimension", type=str, default = "middle", help="dimension of post latent")
 
     parser.add_argument("-e","--epochs",default=150,type=int,help="Number of epochs (default: %(default)s)",)
     parser.add_argument("--entity", type=str, default = "alberto-presta", help="entity name for wandb")
@@ -32,6 +34,7 @@ def parse_args(argv):
     parser.add_argument("--multiple_hyperprior", action="store_true", help="Use cuda")
     parser.add_argument("-m","--model",default="pic",choices=models.keys(),help="Model architecture (default: %(default)s)",)    
     parser.add_argument("--M", type=int, default=640, help="M")
+    parser.add_argument("--mu_std", action="store_true", help="use entire mu as input")
 
 
     parser.add_argument("-n","--num-workers",type=int,default=8,help="Dataloaders threads (default: %(default)s)",) #u_net_post
