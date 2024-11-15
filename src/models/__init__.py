@@ -7,6 +7,8 @@ models = {"cnn":WACNN,"pic":VarianceMaskingPIC,"rem":VarianceMaskingPICREM}
 
 
 def get_model(args,device):
+    
+
 
     if args.model == "cnn":
         net = models[args.model](N = args.N, M = args.M)

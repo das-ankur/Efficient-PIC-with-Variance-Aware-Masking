@@ -121,15 +121,19 @@ def main(argv):
 
 
     net = get_model(args,device)
-    net = net.to(device)
+    #net = net.to(device)
     #net.update()
 
 
     if args.checkpoint != "none":
         print("entro in checkpoint")
         checkpoint = torch.load(args.checkpoint, map_location=device)
-        net.load_state_dict(checkpoint["state_dict"],strict = True)
-
+        checkpoint["args"].model = args.model
+        net = get_model(checkpoint["args"],device)
+        net.load_state_dict(checkpoint["state_dict"], strict = True)
+    else:
+        net = get_model(args,device)
+    net = net.to(device)
     net.update()
 
 
