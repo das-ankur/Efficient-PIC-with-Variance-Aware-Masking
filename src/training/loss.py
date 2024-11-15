@@ -60,3 +60,51 @@ class ScalableRateDistortionLoss(nn.Module):
             out["bpp_loss"] = out["bpp_scalable"] + out["bpp_base"] + batch_size_recon*(out["bpp_hype"])
         out["loss"] = out["bpp_loss"] + self.weight*(lmbda*out["mse_loss"]).mean() 
         return out
+
+
+
+
+class RateDistortionLoss(nn.Module):
+    """Custom rate distortion loss with a Lagrangian parameter."""
+
+    def __init__(self):
+        super().__init__()
+        self.mse = nn.MSELoss()
+
+
+    def forward(self, output, target, lmbda = 1e-2):
+        N, _, H, W = target.size()
+        out = {}
+        num_pixels = N * H * W
+
+        out["bpp_loss"] = sum((torch.log(likelihoods).sum() / (-math.log(2) * num_pixels))for likelihoods in output["likelihoods"].values())
+        
+        
+        out["mse_loss"] = self.mse(output["x_hat"], target)
+        out["loss"] = lmbda * 255 ** 2 * out["mse_loss"] + out["bpp_loss"]
+
+        return out
+    
+
+
+class DistortionLoss(nn.Module):
+    """Custom rate distortion loss with a Lagrangian parameter."""
+
+    def __init__(self):
+        super().__init__()
+        self.mse = nn.MSELoss()
+        #self.lmbda = 1e-2
+
+
+    def forward(self, output, target, lmbda = 1e-2):
+        N, _, H, W = target.size()
+        out = {}
+        num_pixels = N * H * W
+
+        out["bpp_loss"] = sum((torch.log(likelihoods).sum() / (-math.log(2) * num_pixels))for likelihoods in output["likelihoods"].values())
+        
+        
+        out["mse_loss"] = self.mse(output["x_hat"], target)
+        out["loss"] = lmbda*255 ** 2 * out["mse_loss"]
+
+        return out

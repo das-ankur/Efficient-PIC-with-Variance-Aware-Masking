@@ -18,8 +18,11 @@ def train_one_epoch(model,
                       counter,
                       sampling_training = False,
                       list_quality = None,
+                      lmbda_list = None,
                       clip_max_norm = 1.0,
                       wandb_log = False):
+    
+    
     model.train()
     device = next(model.parameters()).device
 
@@ -38,8 +41,10 @@ def train_one_epoch(model,
         if sampling_training:
             quality_index =  random.randint(0, len(list_quality) - 1)
             quality = list_quality[quality_index]
-            out_net = model.forward_single_quality(d, quality = quality, training = False)
-            out_criterion = criterion(out_net, d)
+            out_net = model.forward_single_quality(d, quality = quality, training = True)
+
+            out_criterion = criterion(out_net, d) if lmbda_list is None  \
+                            else criterion(out_net, d, lmbda = lmbda_list[quality_index])
         else:
             out_net = model(d, quality = list_quality)
             out_criterion = criterion(out_net, d)
@@ -91,7 +96,7 @@ def train_one_epoch(model,
 
 
 
-def valid_epoch(epoch, test_dataloader,criterion, model, pr_list = [0.05], wandb_log = True):
+def valid_epoch(epoch, test_dataloader,criterion, model, pr_list = [0.05], wandb_log = True, lmbda_list=None):
     #pr_list =  [0] +  pr_list  + [-1]
     model.eval()
     device = next(model.parameters()).device
@@ -107,27 +112,21 @@ def valid_epoch(epoch, test_dataloader,criterion, model, pr_list = [0.05], wandb
         for d in test_dataloader:
 
             d = d.to(device)
-            for _,p in enumerate(pr_list):
+            for j,p in enumerate(pr_list):
 
                 out_net = model.forward_single_quality(d, quality = p, training = False, mask_pol = "point-based-std")
-
                 psnr_im = compute_psnr(d, out_net["x_hat"])
-                batch_size_images, _, H, W =d.size()
-                num_pixels = batch_size_images * H * W
-                denominator = -math.log(2) * num_pixels
-                likelihoods = out_net["likelihoods"]
-                bpp = (torch.log(likelihoods["y"]).sum() + torch.log(likelihoods["z"]).sum())/denominator
 
-                    
-                bpp_loss.update(bpp)
+
 
                 mse_lss.update(mse_loss(d, out_net["x_hat"]))
                 psnr.update(psnr_im) 
-
-                        #out_net = model(d)
-                out_criterion = criterion(out_net, d) #dddddd
-
+                out_criterion = criterion(out_net, d) if lmbda_list is None \
+                                else criterion(out_net,d,lmbda = lmbda_list[j]) #dddddd
+                
+                bpp = out_criterion["bpp"]
                 loss.update(out_criterion["loss"].clone().detach())
+                bpp_loss.update(bpp)
 
          
 

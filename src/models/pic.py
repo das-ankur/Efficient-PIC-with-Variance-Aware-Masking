@@ -164,10 +164,12 @@ class VarianceMaskingPIC(CompressionModel):
             ) 
 
 
-    def unfreeze_decoder(self):
+    def freeze_all(self):
         for n,p in self.named_parameters():
             p.requires_grad = False
-        
+
+    def unfreeze_decoder(self):
+
         if self.multiple_decoder is False:
             for n,p in self.g_s.named_parameters():
                 p.requires_grad = True
@@ -175,6 +177,17 @@ class VarianceMaskingPIC(CompressionModel):
             for i in range(self.g_s):
                 for n,p in self.g_s[i].named_parameters():
                     p.requires_grad = True
+
+    def unfreeze_encoder(self):
+
+        if self.multiple_encoder is False:
+            for n,p in self.g_s.named_parameters():
+                p.requires_grad = True
+        else:
+            for i in range(self.g_a):
+                for n,p in self.g_a[i].named_parameters():
+                    p.requires_grad = True
+
 
 
     def print_information(self):

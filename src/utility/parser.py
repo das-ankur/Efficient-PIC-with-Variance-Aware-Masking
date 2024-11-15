@@ -57,6 +57,8 @@ def parse_args(argv):
     parser.add_argument("--test_before", action="store_true", help="test before start training")
     parser.add_argument("--training_dataset",  type=str, default = "/scratch/dataset/openimages", help="project name for wandb")
     parser.add_argument("--test_dataset",  type=str, default = "/scratch/dataset/kodak", help="test path")
+    parser.add_argument("--training_type",  type=str, default = "first_train", help="test path")
+    #training_type
 
     parser.add_argument("--valid_batch_size",type=int,default=16,help="Test batch size (default: %(default)s)",)
 

@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 from dataset import ImageFolder, TestKodakDataset
 from models import get_model
-from training import ScalableRateDistortionLoss
+from training import ScalableRateDistortionLoss, RateDistortionLoss, DistortionLoss
 from training import compress_with_ac, train_one_epoch, valid_epoch, test_epoch
 import os
 import sys
@@ -138,30 +138,70 @@ def main(argv):
 
     optimizer, aux_optimizer = configure_optimizers(net, args)
     lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, "min", factor=0.3, patience=args.patience)
-    criterion = ScalableRateDistortionLoss(lmbda_list=args.lmbda_list)
+    
+    if args.training_type == "first_train":
+        criterion = ScalableRateDistortionLoss(lmbda_list=args.lmbda_list)
+    elif args.training_type == "refine_gs":
+        criterion = RateDistortionLoss()
+    else:
+        criterion = DistortionLoss()
 
 
     best_loss = float("inf")
     counter = 0
     epoch_enc = 0
 
-    list_quality = [0,10]
-
+    if args.training_type == "first_train":
+        list_quality = [0,10]
+        lmbda_list = None
+    elif args.training_type == "refine_gs":
+        list_quality = [0.025,0.05,0.1,0.25,0.5,0.75,0.76,1.0, 1.25,1.5,2,2.25,2.5,3,4,5,6,8,10]
+        lmbda_list = None
+    elif args.training_type == "refine_gs_ga":
+        list_quality = [0.025,0.05,0.1,0.15,0.25,0.5,0.6,0.7,0.75,0.9,
+                        1.0,1.15,1.25,1.5,1.75,
+                        2,2.15,2.25,2.5,2.75,
+                        3,3.5,
+                        4,4.5,
+                        5,6,8,10]
+        start = torch.log10(torch.tensor(args.lmbda_list[0]))
+        end = torch.log10(torch.tensor(args.lmbda_list[1]))
+        lmbda_list = torch.logspace(start, end, steps=len(list_quality) + 1)[1:]
+        
+    else:
+        raise NotImplementedError()
 
     if args.checkpoint != "none" and args.test_before:
-        pr_list = [0,0.05,0.1,0.25,0.5,0.6,0.75,1,1.25,2,3,5,10] #ggg
+        pr_list = [0,0.05,0.1,0.25,0.5,0.6,0.75,1,1.25,2,3,5,10] 
         mask_pol = "point-based-std"
 
         bpp_init, psnr_init,_ = compress_with_ac(net, #net 
-                                            filelist, 
-                                           device,
-                                           pr_list =pr_list,  
-                                           mask_pol = mask_pol)
+                                        filelist, 
+                                        device,
+                                        pr_list =pr_list,  
+                                        mask_pol = mask_pol)
     
         print("----> ",bpp_init," ",psnr_init) 
 
-    print("done everything")
-    return 0
+    #print("done everything")
+    
+    print("freeze part of th network according to ",args.training_type)
+    if args.training_type ==  "refine_gs":
+        net.freeze_all()
+        net.unfreeze_decoder()
+    elif args.training_type == "refine_gs_ga":
+        net.freeze_all()
+        net.unfreeze_decoder()
+        net.unfreeze_encoder()  
+
+    print("************************************************************")
+    print("********************** START TRAINING **********************")
+    print("************************************************************")
+    num_tainable = net.print_information()
+    print("************************************************************")
+    print("********************** START TRAINING **********************")
+    print("************************************************************")     
+
 
     for epoch in range(last_epoch, args.epochs):
         print("******************************************************")
@@ -178,7 +218,8 @@ def main(argv):
                                       epoch, 
                                       counter,
                                       list_quality= list_quality,
-                                      sampling_training = args.sampling_training)
+                                      sampling_training = args.sampling_training,
+                                      lmbda_list=lmbda_list)
             
         print("finito il train della epoca")
 
@@ -198,7 +239,8 @@ def main(argv):
                         criterion, 
                         net,
                         pr_list = [0,10],
-                        wandb_log = args.wandb_log) 
+                        wandb_log = args.wandb_log,
+                        lmbda_list=lmbda_list) 
         lr_scheduler.step(loss)
         print(f'Current patience level: {lr_scheduler.patience - lr_scheduler.num_bad_epochs}')
 
