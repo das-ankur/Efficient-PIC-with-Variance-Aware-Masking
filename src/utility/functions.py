@@ -5,8 +5,58 @@ from torchvision import transforms
 from pytorch_msssim import ms_ssim
 import math 
 import torch
-
 from collections import OrderedDict
+import torch.optim as optim
+import wandb
+
+
+
+def save_checkpoint(state, is_best, last_pth,very_best):
+    if is_best:
+        torch.save(state, very_best)
+        wandb.save(very_best)
+    else:
+        torch.save(state, last_pth)
+        wandb.save(last_pth)
+
+
+def configure_optimizers(net, args):
+    """Separate parameters for the main optimizer and the auxiliary optimizer.
+    Return two optimizers"""
+
+    parameters = {
+        n
+        for n, p in net.named_parameters()
+        if not n.endswith(".quantiles") 
+    }
+    aux_parameters = {
+        n
+        for n, p in net.named_parameters()
+        if n.endswith(".quantiles") 
+    }
+
+    
+    # Make sure we don't have an intersection of parameters
+    params_dict = dict(net.named_parameters())
+    inter_params = parameters & aux_parameters
+    union_params = parameters | aux_parameters
+
+    assert len(inter_params) == 0
+    assert len(union_params) - len(params_dict.keys()) == 0
+
+    optimizer = optim.Adam(
+        (params_dict[n] for n in sorted(parameters)),
+        lr=args.learning_rate,
+    )
+
+    aux_optimizer = optim.Adam(
+        (params_dict[n] for n in sorted(aux_parameters)),
+        lr=args.aux_learning_rate,
+    )
+    if args.training_type == "first_strain":
+        return optimizer, aux_optimizer
+    else:
+        return optimizer, None
 
 
 def read_image(filepath,):
@@ -54,10 +104,64 @@ class AverageMeter:
 
 import torch
 
-from torch import Tensor
+def initialize_model_from_pretrained( checkpoint,
+                                     args,
+                                     checkpoint_enh = None):
+
+    sotto_ordered_dict = OrderedDict()
+
+    for c in list(checkpoint.keys()):
+        if "g_s" in c: 
+            if args.multiple_decoder:
+                nuova_stringa = "g_s.0." + c[4:]
+                sotto_ordered_dict[nuova_stringa] = checkpoint[c]
+            else:
+                sotto_ordered_dict[c] = checkpoint[c]
+
+        elif "g_a" in c: 
+            if args.multiple_encoder:
+                nuova_stringa = "g_a.0." + c[4:]
+                sotto_ordered_dict[nuova_stringa] = checkpoint[c]
+            else:
+                sotto_ordered_dict[c] = checkpoint[c]
+        elif "cc_" in c or "lrp_" in c or "gaussian_conditional" or "entropy_bottleneck" in c: 
+            sotto_ordered_dict[c] = checkpoint[c]
+        else:
+            continue
+
+
+    for c in list(sotto_ordered_dict.keys()):
+        if "h_scale_s" in c or "h_a" in c  or "h_mean_s" in c:
+            sotto_ordered_dict.pop(c)
+    if args.multiple_hyperprior:
+        for c in list(checkpoint.keys()):
+            if "h_mean_s" in c:
+                nuova_stringa = "h_mean_s.0." + c[9:]
+                sotto_ordered_dict[nuova_stringa] = checkpoint[c]     
+            elif "h_scale_s" in c:
+                nuova_stringa = "h_scale_s.0." + c[10:]
+                sotto_ordered_dict[nuova_stringa] = checkpoint[c]   
+
+
+    for c in list(sotto_ordered_dict.keys()):
+        if "h_a" in c:
+            sotto_ordered_dict.pop(c)
+
+
+    if checkpoint_enh is not None:
+        print("prendo anche il secondo modello enhanced")
+        for c in list(checkpoint_enh.keys()):
+            if "g_s" in c: 
+                nuova_stringa = "g_s.1." + c[4:]
+                sotto_ordered_dict[nuova_stringa] = checkpoint_enh[c]
+
+            else:
+                continue
 
 
 
+
+    return sotto_ordered_dict
 def create_savepath(base_path):
     very_best  = join(base_path,"_very_best.pth.tar")
     last = join(base_path,"_last.pth.tar")

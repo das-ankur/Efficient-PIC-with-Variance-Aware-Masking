@@ -13,6 +13,8 @@ def get_model(args,device):
     if args.model == "cnn":
         net = models[args.model](N = args.N, M = args.M)
     elif args.model == "pic":
+
+        print("stampo il args: ",args)
         net = models[args.model]( N = args.N,
                                 M = args.M,
                                 multiple_decoder = args.multiple_decoder,

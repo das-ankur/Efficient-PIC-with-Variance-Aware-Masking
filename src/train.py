@@ -1,10 +1,10 @@
 import wandb 
-import random 
 import torch 
 import time 
-import math 
 import torch.optim as optim
-from utility import parse_args, tri_planet_23_psnr, tri_planet_23_bpp, tri_planet_22_bpp, tri_planet_22_psnr, plot_rate_distorsion, create_savepath, sec_to_hours
+from utility import ( parse_args, tri_planet_23_psnr, tri_planet_23_bpp,
+                    tri_planet_22_bpp, tri_planet_22_psnr, plot_rate_distorsion, 
+                    create_savepath, sec_to_hours, initialize_model_from_pretrained, configure_optimizers, save_checkpoint)
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from dataset import ImageFolder, TestKodakDataset
@@ -13,60 +13,18 @@ from training import ScalableRateDistortionLoss, RateDistortionLoss, DistortionL
 from training import compress_with_ac, train_one_epoch, valid_epoch, test_epoch
 import os
 import sys
+import numpy as np
 
 
-
-
-def save_checkpoint(state, is_best, last_pth,very_best):
-    if is_best:
-        torch.save(state, very_best)
-        wandb.save(very_best)
-    else:
-        torch.save(state, last_pth)
-        wandb.save(last_pth)
-
-
-
-def configure_optimizers(net, args):
-    """Separate parameters for the main optimizer and the auxiliary optimizer.
-    Return two optimizers"""
-
-    parameters = {
-        n
-        for n, p in net.named_parameters()
-        if not n.endswith(".quantiles") 
-    }
-    aux_parameters = {
-        n
-        for n, p in net.named_parameters()
-        if n.endswith(".quantiles") 
-    }
-
-    
-    # Make sure we don't have an intersection of parameters
-    params_dict = dict(net.named_parameters())
-    inter_params = parameters & aux_parameters
-    union_params = parameters | aux_parameters
-
-    assert len(inter_params) == 0
-    assert len(union_params) - len(params_dict.keys()) == 0
-
-    optimizer = optim.Adam(
-        (params_dict[n] for n in sorted(parameters)),
-        lr=args.learning_rate,
-    )
-
-    aux_optimizer = optim.Adam(
-        (params_dict[n] for n in sorted(aux_parameters)),
-        lr=args.aux_learning_rate,
-    )
-    return optimizer, aux_optimizer
 
 
 
 def main(argv):
     args = parse_args(argv)
     print(args)
+
+
+
 
 
     train_path =  args.training_dataset
@@ -120,19 +78,29 @@ def main(argv):
 
 
 
-    net = get_model(args,device)
+    #net = get_model(args,device)
     #net = net.to(device)
     #net.update()
 
 
     if args.checkpoint != "none":
         print("entro in checkpoint")
-        checkpoint = torch.load(args.checkpoint, map_location=device)
+        checkpoint = torch.load(args.checkpoint, map_location="cuda")
+        #print("vedo il checkpoint: ",checkpoint)
         checkpoint["args"].model = args.model
+        args_save = checkpoint["args"]
         net = get_model(checkpoint["args"],device)
-        net.load_state_dict(checkpoint["state_dict"], strict = True)
+        net.load_state_dict(checkpoint["state_dict"], strict = True) #state_dict
     else:
-        net = get_model(args,device)
+        if args.checkpoint_base != "none":
+            net = get_model(args,device)
+            base_checkpoint = torch.load(args.checkpoint_base,map_location=device)
+            new_check = initialize_model_from_pretrained(base_checkpoint, args)
+            net.load_state_dict(new_check,strict = False)
+            args_save = args
+        else:
+            net = get_model(args,device)
+            args_save = args
     net = net.to(device)
     net.update()
 
@@ -145,7 +113,7 @@ def main(argv):
     
     if args.training_type == "first_train":
         criterion = ScalableRateDistortionLoss(lmbda_list=args.lmbda_list)
-    elif args.training_type == "refine_gs":
+    elif args.training_type == "refine_gs_ga":
         criterion = RateDistortionLoss()
     else:
         criterion = DistortionLoss()
@@ -159,15 +127,17 @@ def main(argv):
         list_quality = [0,10]
         lmbda_list = None
     elif args.training_type == "refine_gs":
-        list_quality = [0.025,0.05,0.1,0.25,0.5,0.75,0.76,1.0, 1.25,1.5,2,2.25,2.5,3,4,5,6,8,10]
+
+        print("entro qua per il list_pr")
+        list_pr_1 = list(np.arange(0.015,1.5 ,(1.5 - 0.025)/200)) + [1.5]
+        list_pr_2 = list(np.arange(1.6,10 ,(10 - 1.6)/50)) + [10]
+        list_quality = list_pr_1 + list_pr_2
+
         lmbda_list = None
     elif args.training_type == "refine_gs_ga":
-        list_quality = [0.025,0.05,0.1,0.15,0.25,0.5,0.6,0.7,0.75,0.9,
-                        1.0,1.15,1.25,1.5,1.75,
-                        2,2.15,2.25,2.5,2.75,
-                        3,3.5,
-                        4,4.5,
-                        5,6,8,10]
+        list_pr_1 = list(np.arange(0.015,1.5 ,(1.5 - 0.025)/200)) + [1.5]
+        list_pr_2 = list(np.arange(1.6,10 ,(10 - 1.6)/50)) + [10]
+        list_quality = list_pr_1 + list_pr_2
         start = torch.log10(torch.tensor(args.lmbda_list[0]))
         end = torch.log10(torch.tensor(args.lmbda_list[1]))
         lmbda_list = torch.logspace(start, end, steps=len(list_quality) + 1)[1:]
@@ -186,9 +156,10 @@ def main(argv):
                                         mask_pol = mask_pol)
     
         print("----> ",bpp_init," ",psnr_init) 
+    
 
     #print("done everything")
-    
+
     print("freeze part of th network according to ",args.training_type)
     if args.training_type ==  "refine_gs":
         net.freeze_all()
@@ -205,7 +176,7 @@ def main(argv):
     print("************************************************************")
     print("********************** START TRAINING **********************")
     print("************************************************************")     
-    return 0
+    
 
     for epoch in range(last_epoch, args.epochs):
         print("******************************************************")
@@ -223,7 +194,8 @@ def main(argv):
                                       counter,
                                       list_quality= list_quality,
                                       sampling_training = args.sampling_training,
-                                      lmbda_list=lmbda_list)
+                                      lmbda_list=lmbda_list,
+                                      wandb_log = args.wandb_log_train)
             
         print("finito il train della epoca")
 
@@ -248,7 +220,7 @@ def main(argv):
         lr_scheduler.step(loss)
         print(f'Current patience level: {lr_scheduler.patience - lr_scheduler.num_bad_epochs}')
 
-        list_pr = [0,0.25,0.5,1,1.5,2,2.5,3,3.5,4,5,6,10]
+        list_pr = [0,0.05,0.1,0.25,0.5,0.6,0.75,1,1.25,2,3,5,10] 
         mask_pol = "point-based-std"
         bpp_t, psnr_t = test_epoch(epoch, 
                        test_dataloader,
@@ -271,16 +243,16 @@ def main(argv):
 
 
 
-        if epoch%5==0 or is_best:
+        if epoch%2==0 or is_best:
             net.update()
             #net.lmbda_list
             bpp, psnr,_ = compress_with_ac(net,  
                                             filelist, 
                                             device,
-                                           epoch = -10, 
+                                          
                                            pr_list =list_pr,  
-                                            mask_pol = mask_pol,
-                                            writing = None)
+                                            mask_pol = mask_pol
+                                           )
 
 
             psnr_res = {}
@@ -289,8 +261,13 @@ def main(argv):
             bpp_res["our"] = bpp
             psnr_res["our"] = psnr
 
-            psnr_res["base"] =   [29.20, 30.59,32.26,34.15,35.91,37.72]
-            bpp_res["base"] =  [0.127,0.199,0.309,0.449,0.649,0.895]
+
+            if args.test_before:
+                psnr_res["prior"] =   bpp_init
+                bpp_res["prior"] =  psnr_init
+            else:
+                psnr_res["base"] =   [29.20, 30.59,32.26,34.15,35.91,37.72]
+                bpp_res["base"] =  [0.127,0.199,0.309,0.449,0.649,0.895]
 
             bpp_res["tri_planet_23"] = tri_planet_23_bpp
             psnr_res["tri_planet_23"] = tri_planet_23_psnr
@@ -323,7 +300,7 @@ def main(argv):
                         "optimizer": optimizer.state_dict(),
                         "lr_scheduler": lr_scheduler.state_dict(),
                         "aux_optimizer":aux_optimizer.state_dict() if aux_optimizer is not None else "None",
-                        "args":args
+                        "args":args_save
         
                     },
                     is_best,

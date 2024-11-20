@@ -12,7 +12,8 @@ def parse_args(argv):
 
     parser.add_argument("--clip_max_norm",default=1.0,type=float,help="gradient clipping max norm (default: %(default)s",)
     parser.add_argument("--code", type=str, default = "0001", help="Batch size (default: %(default)s)")
-    parser.add_argument("--checkpoint", type=str, default = "/scratch/ResDSIC/demo/l2_train/2l_memdmh_mem5/_very_best.pth.tar") #dddd
+    parser.add_argument("--checkpoint", type=str, default = "/scratch/ResDSIC/demo/l2_train/2l_memdmh_mem5/_very_best.pth.tar") #"/scratch/ResDSIC/demo/l2_train/2l_memdmh_mem5/_very_best.pth.tar"
+    parser.add_argument("--checkpoint_base", type=str, default = "none") #dddd
     parser.add_argument("--cuda", action="store_true", help="Use cuda")
     parser.add_argument("--check_levels", nargs='+', type=int, default = [0.05, 0.75, 2])
 
@@ -24,7 +25,7 @@ def parse_args(argv):
     parser.add_argument("-e","--epochs",default=150,type=int,help="Number of epochs (default: %(default)s)",)
     parser.add_argument("--entity", type=str, default = "alberto-presta", help="entity name for wandb")
 
-    parser.add_argument( "-lr", "--learning-rate", default=1e-4, type=float, help="Learning rate (default: %(default)s)",)
+    parser.add_argument( "-lr", "--learning-rate", default=1e-4, type=float, help="Learning rate (default: %(default)s)",) #dd
     parser.add_argument("--lmbda_list", nargs='+', type=float, default = [ 0.0055,0.04])
     parser.add_argument("--list_quality", nargs='+', type=int, default = [0,10])
     
@@ -38,13 +39,14 @@ def parse_args(argv):
 
 
     parser.add_argument("-n","--num-workers",type=int,default=8,help="Dataloaders threads (default: %(default)s)",) #u_net_post
-    parser.add_argument("--num_images", type=int, default=300000, help="num images") #ddddddd
+    parser.add_argument("--num_images", type=int, default=100000, help="num images") #ddddddd
     parser.add_argument("--num_images_val", type=int, default=816, help="Batch size (default: %(default)s)")
     parser.add_argument("--N", type=int, default=192, help="N")#ddddd#ddd
+    parser.add_argument("--num_points", type=int, default=100, help="num points per segments")
 
 
     parser.add_argument("--patch-size",type=int,nargs=2,default=(256, 256),help="Size of the patches to be cropped (default: %(default)s)",)
-    parser.add_argument("--patience", type=int, default=7, help="patience")
+    parser.add_argument("--patience", type=int, default=8, help="patience")
     parser.add_argument("--project", type=str, default = "PIC", help="project name for wandb")
     
 
@@ -60,13 +62,14 @@ def parse_args(argv):
     parser.add_argument("--test_before", action="store_true", help="test before start training")
     parser.add_argument("--training_dataset",  type=str, default = "/scratch/dataset/openimages", help="project name for wandb")
     parser.add_argument("--test_dataset",  type=str, default = "/scratch/dataset/kodak", help="test path")
-    parser.add_argument("--training_type",  type=str, default = "first_train", help="test path")
+    parser.add_argument("--training_type",  type=str, default = "refine_gs", help="type of test")
     #training_type
 
     parser.add_argument("--valid_batch_size",type=int,default=16,help="Test batch size (default: %(default)s)",)
 
 
     parser.add_argument("--wandb_log", action="store_true", help="Use cuda")
+    parser.add_argument("--wandb_log_train", action="store_true", help="Use cuda")
     parser.add_argument("--writing", type=str, default = "none", help = "writing test results on file txt") #dddd
     
 

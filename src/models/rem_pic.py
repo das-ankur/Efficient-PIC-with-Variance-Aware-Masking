@@ -56,7 +56,15 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
                                 )
 
 
-    def load_state_dict(self, state_dict, strict=True):
+    def unfreeze_rems(self):
+        for n,p in self.named_parameters():
+            p.requires_grad = False
+
+        for i in range(len(self.post_latent)):
+            for n,p in self.post_latent[i].named_parameters():
+                p.requires_grad = True      
+
+    def load_state_dict(self, state_dict):
         # Carica i parametri del modello padre
         parent_state_dict = {k: v for k, v in state_dict.items() if k in self.state_dict() and 'post_latent' not in k}
         super().load_state_dict(parent_state_dict, strict=False)
@@ -114,12 +122,12 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
 
 
         out_latent = self.compress( x, 
-                                   quality =self.check_levels[0],
+                                   quality =quality,
                                     mask_pol ="point-based-std",
                                     real_compress=rc) #["y_hat"] #ddd
             
-        if quality == self.check_levels[0]:
-            return out_latent["y_hat"]
+        #if quality == self.check_levels[0]:
+        return out_latent["y_hat"]
             
         out_latent_1 = self.compress( x, 
                                 quality =self.check_levels[1],
@@ -212,6 +220,10 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
             scale = enhanced_params
             return mu, scale
 
+
+
+    def forward_single_quality(self, x, quality, mask_pol="point-based-std", training=False, checkpoint_ref = None):
+        return self.forward(x = x, quality = quality, mask_pol = mask_pol, training = training, checkpoint_ref=checkpoint_ref)
 
     def forward(self, x, mask_pol = "point-based-std", quality = 0, training  = True, checkpoint_ref = None ):
 

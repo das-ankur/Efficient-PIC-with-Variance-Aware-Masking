@@ -174,9 +174,9 @@ class VarianceMaskingPIC(CompressionModel):
             for n,p in self.g_s.named_parameters():
                 p.requires_grad = True
         else:
-            for i in range(self.g_s):
-                for n,p in self.g_s[i].named_parameters():
-                    p.requires_grad = True
+            #for i in range(len(self.g_s)):
+            for n,p in self.g_s[1].named_parameters():
+                p.requires_grad = True
 
     def unfreeze_encoder(self):
 
@@ -184,9 +184,9 @@ class VarianceMaskingPIC(CompressionModel):
             for n,p in self.g_s.named_parameters():
                 p.requires_grad = True
         else:
-            for i in range(self.g_a):
-                for n,p in self.g_a[i].named_parameters():
-                    p.requires_grad = True
+            #for i in range(1,len(self.g_a)):
+            for n,p in self.g_a[1].named_parameters():
+                p.requires_grad = True
 
 
 
@@ -460,10 +460,6 @@ class VarianceMaskingPIC(CompressionModel):
 
 
 
-            if self.u_net_post == 1:
-                x_hat_current = self.refine(x_hat_current)
-            elif self.u_net_post == 2:
-                x_hat_current = self.refine[1](x_hat_current)
 
 
             y_likelihood_single_quality = torch.cat(y_likelihood_quality,dim = 1)
@@ -474,10 +470,12 @@ class VarianceMaskingPIC(CompressionModel):
         
 
         if len(y_likelihood_total)==0:
-            y_likelihood_total = torch.ones_like(y_likelihoods_b).to(y_likelihoods_b.device)
+            y_likelihood_total = y_likelihoods_b # torch.ones_like(y_likelihoods_b).to(y_likelihoods_b.device)
         else:
             y_likelihood_total = torch.cat(y_likelihood_total,dim = 0)  #sliirrr
         x_hats = torch.cat(x_hat_progressive,dim = 0)
+
+
 
         return {
             "x_hat": x_hats,

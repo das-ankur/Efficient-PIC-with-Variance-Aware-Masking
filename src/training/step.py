@@ -20,7 +20,8 @@ def train_one_epoch(model,
                       list_quality = None,
                       lmbda_list = None,
                       clip_max_norm = 1.0,
-                      wandb_log = False):
+                      wandb_log = False,
+                      rems = False):
     
     
     model.train()
@@ -76,6 +77,7 @@ def train_one_epoch(model,
                 "train_batch/bpp_progressive":out_criterion["bpp_scalable"].clone().detach().item(),
             }
             wandb.log(wand_dict)
+
         
         counter += 1
 
@@ -124,13 +126,13 @@ def valid_epoch(epoch, test_dataloader,criterion, model, pr_list = [0.05], wandb
                 out_criterion = criterion(out_net, d) if lmbda_list is None \
                                 else criterion(out_net,d,lmbda = lmbda_list[j]) #dddddd
                 
-                bpp = out_criterion["bpp"]
+                bpp = out_criterion["bpp_loss"]
                 loss.update(out_criterion["loss"].clone().detach())
                 bpp_loss.update(bpp)
 
          
 
-    if wandb_log is False: 
+    if wandb_log: 
         log_dict = {
                 "valid":epoch,
                 "valid/loss": loss.avg,
@@ -168,7 +170,7 @@ def test_epoch(epoch, test_dataloader, model, pr_list, wandb_log = False):
                 num_pixels = batch_size_images * H * W
                 denominator = -math.log(2) * num_pixels #dddd
                 likelihoods = out_net["likelihoods"]
-                bpp = (torch.log(likelihoods["y"]).sum() + torch.log(likelihoods["z"]).sum())/denominator
+                bpp = ((torch.log(likelihoods["y"]).sum())  + (torch.log(likelihoods["z"]).sum()))/denominator
 
 
                 psnr[j].update(psnr_im)
@@ -192,13 +194,6 @@ def test_epoch(epoch, test_dataloader, model, pr_list, wandb_log = False):
                 }
 
             wandb.log(log_dict)
-
-            if "mutual" in list(out_net):
-                log_dict = {
-                    name:epoch,
-                    name + "/mutual":mutual_info[i].avg
-                    }
-                wandb.log(log_dict)
 
     return [bpp_loss[i].avg for i in range(len(bpp_loss))], [psnr[i].avg for i in range(len(psnr))]
 
