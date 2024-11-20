@@ -35,7 +35,10 @@ def main(argv):
 
     if args.wandb_log:
         assert args.entity is not None
-        wandb.init( config= args, project=args.project, entity=args.entity)
+        if args.training_type == "first_train":
+            wandb.init( config= args, project="PIC-SCRATCH", entity=args.entity)
+        else:
+            wandb.init( config= args, project=args.project, entity=args.entity)
     
 
 
@@ -257,14 +260,14 @@ def main(argv):
 
             psnr_res = {}
             bpp_res = {}
-
+            print("la compression come è andata: ",bpp, "  ",psnr)
             bpp_res["our"] = bpp
             psnr_res["our"] = psnr
 
 
             if args.test_before:
-                psnr_res["prior"] =   bpp_init
-                bpp_res["prior"] =  psnr_init
+                bpp_res["base"] =   bpp_init
+                psnr_res["base"] =  psnr_init
             else:
                 psnr_res["base"] =   [29.20, 30.59,32.26,34.15,35.91,37.72]
                 bpp_res["base"] =  [0.127,0.199,0.309,0.449,0.649,0.895]
