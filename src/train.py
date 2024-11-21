@@ -2,7 +2,7 @@ import wandb
 import torch 
 import time 
 import torch.optim as optim
-from utility import ( parse_args, tri_planet_23_psnr, tri_planet_23_bpp,
+from utility import ( parse_args, tri_planet_23_psnr, tri_planet_23_bpp, psnr_best, bpp_best,
                     tri_planet_22_bpp, tri_planet_22_psnr, plot_rate_distorsion, 
                     create_savepath, sec_to_hours, initialize_model_from_pretrained, configure_optimizers, save_checkpoint)
 from torch.utils.data import DataLoader
@@ -166,7 +166,7 @@ def main(argv):
     print("freeze part of th network according to ",args.training_type)
     if args.training_type ==  "refine_gs":
         net.freeze_all()
-        net.unfreeze_decoder()
+        net.unfreeze_decoder(lrp = args.lrp)
     elif args.training_type == "refine_gs_ga":
         net.freeze_all()
         net.unfreeze_decoder()
@@ -271,6 +271,10 @@ def main(argv):
             else:
                 psnr_res["base"] =   [29.20, 30.59,32.26,34.15,35.91,37.72]
                 bpp_res["base"] =  [0.127,0.199,0.309,0.449,0.649,0.895]
+
+
+                bpp_res["best"] = bpp_best
+                psnr_res["best"] =  psnr_best
 
             bpp_res["tri_planet_23"] = tri_planet_23_bpp
             psnr_res["tri_planet_23"] = tri_planet_23_psnr

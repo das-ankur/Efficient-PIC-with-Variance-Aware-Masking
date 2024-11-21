@@ -204,23 +204,12 @@ class EntropyModel(nn.Module):
             raise ValueError(f"Invalid offsets size {self._cdf_length.size()}")
 
     def compress(self, inputs, indexes, means=None, flag=1, already_quantize = False):
-        """
-        Compress input tensors to char strings.
 
-        Args:
-            inputs (torch.Tensor): input tensors
-            indexes (torch.IntTensor): tensors CDF indexes
-            means (torch.Tensor, optional): optional tensor means
-        """
-        
         if already_quantize is False:
             symbols = self.quantize(inputs, "symbols", means)
         else:
             symbols = inputs
         
-
-
-
 
 
 
@@ -240,22 +229,6 @@ class EntropyModel(nn.Module):
 
 
         for i in range(symbols.size(0)):
-             #print("------------------------------------------------------------------")
-            #print("****************** PROVA **********************************") 
-            #time_s = time.time()
-            #rv2 = self.entropy_coder.encode_with_indexes(
-            #    symbols[i].reshape(-1).int().tolist()[:10],
-            #    indexes[i].reshape(-1).int().tolist()[:10],
-            #    self._quantized_cdf.tolist(),
-            #    self._cdf_length.reshape(-1).int().tolist(),
-            #    self._offset.reshape(-1).int().tolist(),
-            #)            
-            #time_e = time.time()
-            #print("time for 10 elements: ",time_e - time_s)
-            #print("************************** fine prova")
-            #print("i: ",i)
-            #print(len(symbols[i].reshape(-1).int().tolist()))
-            #time_s = time.time()
             rv = self.entropy_coder.encode_with_indexes(
                 symbols[i].reshape(-1).int().tolist(),
                 indexes[i].reshape(-1).int().tolist(),
@@ -263,10 +236,7 @@ class EntropyModel(nn.Module):
                 self._cdf_length.reshape(-1).int().tolist(),
                 self._offset.reshape(-1).int().tolist(),
             )
-            #time_e = time.time()
-            #print("time: ",time_e - time_s)
             strings.append(rv)
-            #print("------------------------------------------------------------------")
 
 
         return strings
