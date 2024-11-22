@@ -10,7 +10,7 @@ import sys
 
 def main(argv):
 
-    q_levs = [0,0.002,0.05,0.5,0.75,1,1.5,2,2.5,3,4,5,5.5,6,6.6,10] 
+    q_levs = [0,0.02,0.05,0.5,0.75,1,1.5,2,2.5,3,4,5,5.5,6,6.6,10] 
     args = parse_args_demo(argv)
     print(args)
     if args.wandb:
@@ -21,13 +21,14 @@ def main(argv):
 
     print("Initializing and loading the model")
     start_t = time.time()
-    checkpoint["args"].model = args.model
     checkpoint = torch.load(args.checkpoint, map_location="cuda")
+    checkpoint["args"].model = args.model
     net = get_model(checkpoint["args"],device)
     net.load_state_dict(checkpoint["state_dict"], strict = True) #state_dict
 
     print("initialization is over.")
-    print("time for initialization is: ",sec_to_hours(time.time() - start_t)) #ddd
+    print("time for initialization is")
+    sec_to_hours(time.time() - start_t) #ddd
 
 
     path_save = args.path_save
@@ -35,15 +36,16 @@ def main(argv):
     name_image = path_image.split("/")[-1].split(".")[0]
     x_padded, unpad = read_and_pads_image(path_image,device)
 
-    ql = [0] + args.q_list
+    ql = [0] + q_levs
     for i,c in enumerate(ql):
         ql[i] = c*10
 
     print("start encoding following this q_list: ",ql)
     start_enc = time.time()
-    bitstreams = encode(net, x_padded, path_save, name_image , q_ind = q_levs,rems = args.rems)
+    bitstreams = encode(net, x_padded, path_save, name_image , q_list = q_levs,rems = args.rems)
     end_enc = time.time()
-    print("time for encoding: ",sec_to_hours(end_enc - start_enc))
+    print("time for encoding")
+    sec_to_hours(end_enc - start_enc)
 
     return 0
 
@@ -55,7 +57,8 @@ def main(argv):
     start_dec_base = time.time()
     rec_hat_base  = decode(net, bitstreams, shape, q_ind = 0)
     end_dec_base = time.time()
-    print("time for decoding first base level: ",sec_to_hours(end_dec_base - start_dec_base))
+    print("time for decoding first base level")
+    sec_to_hours(end_dec_base - start_dec_base)
 
     y_hat_base = rec_hat_base["y_hat"]
 

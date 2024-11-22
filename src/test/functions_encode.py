@@ -18,13 +18,13 @@ def encode(model, x_padded, path_save, name_image,rems = False,q_list = q_list):
     start_base = time.time()
     out_base = model.compress(x_padded, quality = 0)
     end_base = time.time()
-    print("time for encoding base: ",sec_to_hours(end_base - start_base))
+    print("Done encoding base: ",end_base - start_base)
 
 
     mu_base = out_base["mean_base"]
-    std_base = out_base["std_base"]
-    y_hat_base = out_base["y_hat"]
-    y = out_base["y"]
+    std_base = out_base["scale_base"]
+    y_hat_base = out_base["y_hat_base"]
+    #y = out_base["y"]
 
     
     strings_z = out_base["strings"][1]
@@ -68,7 +68,7 @@ def encode(model, x_padded, path_save, name_image,rems = False,q_list = q_list):
     bitstreams["top"] = bitstreams_list 
     bitstreams["y_shape"] = shape 
     #bitstreams["unpad"] = unpad
-    print("done: ",end_t-start_t) 
+    print("Done encoding progressive parts: ",end_t-start_t) 
     return bitstreams 
 
 
@@ -102,8 +102,8 @@ def extract_all_bitsreams(model, x, y_hat_base, mu_base,std_base, q_list, y_chec
     r_slices = []
     indexes_slices = []
     scale_slices = []
-    print("one cycle for")
-    start_t = time.time()
+    #print("one cycle for")
+    #start_t = time.time()
     for slice_index in range(model.ns0,model.ns1):
 
         current_index = slice_index%model.ns0
@@ -111,8 +111,8 @@ def extract_all_bitsreams(model, x, y_hat_base, mu_base,std_base, q_list, y_chec
         if model.delta_encode:
             r_slice = y_slice - y_slices[current_index]
 
-        y_shape
-        mu,mu_t, scale = extract_retrieve_entropy_parameters(current_index,
+
+        mean_support, mu,mu_t, scale = extract_retrieve_entropy_parameters(current_index,
                                                             model,
                                                             mu_total,
                                                             std_total, 
@@ -135,8 +135,8 @@ def extract_all_bitsreams(model, x, y_hat_base, mu_base,std_base, q_list, y_chec
         r_slices.append(r_slice_quantize)
         indexes_slices.append(indexes_sl)
         scale_slices.append(scale_slice)
-    end_t = time.time()
-    print("end for cycle: ",sec_to_hours(end_t - start_t))
+    #end_t = time.time()
+    #print("end for cycle: ",end_t - start_t)
 
 
     r_hat_slice = torch.cat(r_slices,dim = 0) #[10,ch*h*w]
@@ -158,8 +158,8 @@ def extract_all_bitsreams(model, x, y_hat_base, mu_base,std_base, q_list, y_chec
 
     bitstream = []
     for j, qs in enumerate(q_list):
-        print("start encoding level ",qs)
-        start_qs = time.time()
+        #print("start encoding level ",qs)
+        #start_qs = time.time()
         q_end = qs*10
         q_init = 0 if j == 0 else q_list[j-1]
         #q_init = q_list[j-1]
@@ -177,7 +177,7 @@ def extract_all_bitsreams(model, x, y_hat_base, mu_base,std_base, q_list, y_chec
                                                              indexes_l,
                                                              already_quantize = True)
         end_qs = time.time()
-        print("time for encoding is ",end_qs - start_qs)
+        #print("time for encoding is ",end_qs - start_qs)
         bitstream.append(symbols_q)
     
     #ora inizia la parte di decoding 

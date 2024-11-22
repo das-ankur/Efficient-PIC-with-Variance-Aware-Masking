@@ -709,6 +709,7 @@ class VarianceMaskingPIC(CompressionModel):
         masks = []
 
         scales_baseline = []
+        mean_base = []
 
         for slice_index in range(self.ns0):
             y_slice = y_slices[slice_index]
@@ -731,6 +732,7 @@ class VarianceMaskingPIC(CompressionModel):
             scale = scale[:, :, :y_shape[0], :y_shape[1]]
 
             scales_baseline.append(scale)
+            mean_base.append(mu)
 
             index = self.gaussian_conditional.build_indexes(scale)
             y_q_string  = self.gaussian_conditional.compress(y_slice, index,mu)
@@ -748,7 +750,15 @@ class VarianceMaskingPIC(CompressionModel):
             y_hat_slices.append(y_hat_slice)
 
         if quality <= 0:
-            return {"strings": [y_strings, z_strings],"shape":z.size()[-2:], "masks":masks}
+            mean_base = torch.cat(mean_base,dim = 1)
+            scale_base = torch.cat(scales_baseline,dim = 1)
+            y_hat_base = torch.cat(y_hat_slices,dim = 1)
+            return {"strings": [y_strings, z_strings],
+                    "shape":z.size()[-2:], 
+                    "masks":masks, 
+                    "mean_base":mean_base,
+                    "scale_base":scale_base,
+                    "y_hat_base":y_hat_base}
         
         y_hat_slices_quality = []
         #y_hat_slices_quality = y_hat_slices + []
