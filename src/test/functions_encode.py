@@ -7,20 +7,18 @@ import pickle
 import time
 import torch
 from .utils import extract_retrieve_entropy_parameters 
-
+from utility import sec_to_hours
 
 q_list = [0.002,0.05,0.5,0.75,1,1.5,2,2.5,3,4,5,5.5,6,6.6,10] 
 
-def encode(model,d,device,savepath,rems = False,q_list = q_list):
+def encode(model, x_padded, path_save, name_image,rems = False,q_list = q_list):
 
-    nome_immagine = d.split("/")[-1].split(".")[0]
-    x = read_image(d).to(device)
-    x = x.unsqueeze(0) 
-    h, w = x.size(2), x.size(3)
-    pad, unpad = compute_padding(h, w, min_div=2**6)  # pad to allow 6 strides of 2
-    x_padded = F.pad(x, pad, mode="constant", value=0)
 
+    print("encode level base")
+    start_base = time.time()
     out_base = model.compress(x_padded, quality = 0)
+    end_base = time.time()
+    print("time for encoding base: ",sec_to_hours(end_base - start_base))
 
 
     mu_base = out_base["mean_base"]
@@ -32,7 +30,7 @@ def encode(model,d,device,savepath,rems = False,q_list = q_list):
     strings_z = out_base["strings"][1]
     strings_base = out_base["strings"][0]
     
-    folder = os.path.join(savepath,nome_immagine)
+    folder = os.path.join(path_save,name_image)
     os.makedirs(folder,exist_ok = True)
     name =  os.path.join(folder,"base.pkl")
     with open(name, 'wb') as file:
@@ -48,7 +46,7 @@ def encode(model,d,device,savepath,rems = False,q_list = q_list):
 
 
     bitstreams = {}
-
+    bitstreams["q_list"] = q_list
     bitstreams["shape"] = out_base["shape"]
     bitstreams["z"] = out_base["strings"][1]
     bitstreams["base"] = out_base["strings"][0]
@@ -69,13 +67,13 @@ def encode(model,d,device,savepath,rems = False,q_list = q_list):
     end_t = time.time()
     bitstreams["top"] = bitstreams_list 
     bitstreams["y_shape"] = shape 
-    bitstreams["unpad"] = unpad
+    #bitstreams["unpad"] = unpad
     print("done: ",end_t-start_t) 
     return bitstreams 
 
 
 
-def extract_all_bitsreams(model, x, y_hat_base, mu_base,std_base, q_list, y_checkpoint = None):
+def extract_all_bitsreams(model, x, y_hat_base, mu_base,std_base, q_list, y_checkpoint = None, rems = False):
 
 
     if model.multiple_encoder:
@@ -104,7 +102,8 @@ def extract_all_bitsreams(model, x, y_hat_base, mu_base,std_base, q_list, y_chec
     r_slices = []
     indexes_slices = []
     scale_slices = []
-
+    print("one cycle for")
+    start_t = time.time()
     for slice_index in range(model.ns0,model.ns1):
 
         current_index = slice_index%model.ns0
@@ -136,7 +135,8 @@ def extract_all_bitsreams(model, x, y_hat_base, mu_base,std_base, q_list, y_chec
         r_slices.append(r_slice_quantize)
         indexes_slices.append(indexes_sl)
         scale_slices.append(scale_slice)
-
+    end_t = time.time()
+    print("end for cycle: ",sec_to_hours(end_t - start_t))
 
 
     r_hat_slice = torch.cat(r_slices,dim = 0) #[10,ch*h*w]
@@ -158,9 +158,11 @@ def extract_all_bitsreams(model, x, y_hat_base, mu_base,std_base, q_list, y_chec
 
     bitstream = []
     for j, qs in enumerate(q_list):
-        print("----> ",qs)
+        print("start encoding level ",qs)
+        start_qs = time.time()
         q_end = qs*10
         q_init = 0 if j == 0 else q_list[j-1]
+        #q_init = q_list[j-1]
         q_init = q_init*10
         init_length = int((q_init*shapes)/100) + 1 if j > 0 else 0 
         end_length =  int((q_end*shapes)/100) 
@@ -170,18 +172,18 @@ def extract_all_bitsreams(model, x, y_hat_base, mu_base,std_base, q_list, y_chec
 
         symbols_list = torch.flatten(r_hat_tbc).unsqueeze(0) # [1,10*(end_length - init_length)]
         indexes_l = torch.flatten(ordered_index_bc).unsqueeze(0) # [1,10*K]
-        time_s = time.time()
+
         symbols_q = model.gaussian_conditional.compress(symbols_list,
                                                              indexes_l,
                                                              already_quantize = True)
-        time_e = time.time()
-        print("time for encoding is ",time_e - time_s)
+        end_qs = time.time()
+        print("time for encoding is ",end_qs - start_qs)
         bitstream.append(symbols_q)
     
     #ora inizia la parte di decoding 
     # ordered_scale,std_ordering_index = torch.sort(scale_hat_slice, dim=0, descending=True) 
     # ordered_index = torch.gather(index_hat_slice,dim = 0,index = std_ordering_index) #[10,ch*h*w]
-    
+    """
     print("here we decode the stuff just to see if it works")
     print("TO DO:delete this part")
     for j in range(len(bitstream)):
@@ -204,7 +206,7 @@ def extract_all_bitsreams(model, x, y_hat_base, mu_base,std_base, q_list, y_chec
         
 
         r_hat_tbc = r_hat_tbc.reshape(1,10,-1)  #divido nelle sottosezioni
-    
+    """
     return bitstream, shapes
 
 

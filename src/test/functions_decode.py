@@ -54,14 +54,9 @@ def decode_base(model, bits, latent_means, latent_scales, z_hat):
 
     return {"y_hat": y_hat_b, "scale":scales,"mu":mus}
 
-def decode(model,
-           bitstreams,
-           shape, 
-           q_list = q_list,
-           q_ind = 0,
-           y_hat_base = None
-           ):
+def decode(model, bitstreams, shape, q_ind = 0, y_hat_base = None):
 
+    q_list = bitstreams["q_list"]
     assert q_ind < len(q_list)
 
     latent_means, latent_scales, y_shape = extract_latents_from_bits(model, bitstreams, q_ind)
@@ -78,7 +73,7 @@ def decode(model,
 
     if q_ind == 0:
         x_hat = model.g_s[0](y_hat_base).clamp_(0, 1) if model.multiple_decoder else model.g_s(y_hat_base).clamp_(0, 1)
-        return {"x_hat":x_hat}
+        return {"x_hat":x_hat,"y_hat":y_hat_base}
     
 
 
@@ -127,13 +122,15 @@ def decode(model,
     ordered_mean = torch.gather(mean,dim =1, index = std_ordering_index )
     r_dec = ordered_mean
     r_decode = []
+
+
     for j in range(q_ind):
         qs =q_list[j]
 
         q_end = qs*10
         q_init = 0 if j == 0 else q_list[j-1]
         q_init = q_init*10
-        init_length = int((q_init*shape)/100) + 1 if j > 0 else 0 
+        init_length = int((q_init*shape)/100) + 1 #if j > 0 else 0 
         end_length =  int((q_end*shape)/100) 
 
         symbols = bitstreams[j]
@@ -178,9 +175,9 @@ def decode(model,
 
     y_hat_en = torch.cat(y_hat_slices,dim = 1)
     if model.multiple_decoder:
-        x_hat = model.g_s[1](y_hat_en).clamp_(0, 1)
+        x_hat = model.g_s[1](y_hat_en)
     else:
-        x_hat = model.g_s(y_hat_en).clamp_(0, 1) 
+        x_hat = model.g_s(y_hat_en)
     return {"x_hat": x_hat}   
 
 

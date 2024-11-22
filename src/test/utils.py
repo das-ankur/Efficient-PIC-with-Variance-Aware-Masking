@@ -1,7 +1,16 @@
 
-
+from utility import  read_image, compute_padding
 import torch 
+import torch.nn.functional as F 
 
+
+def read_and_pads_image(d,device):
+    x = read_image(d).to(device)
+    x = x.unsqueeze(0) 
+    h, w = x.size(2), x.size(3)
+    pad, unpad = compute_padding(h, w, min_div=2**6)  # pad to allow 6 strides of 2
+    x_padded = F.pad(x, pad, mode="constant", value=0)
+    return x_padded, unpad
 
 
 def extract_latents_from_bits(model,bitstreams,q_ind):

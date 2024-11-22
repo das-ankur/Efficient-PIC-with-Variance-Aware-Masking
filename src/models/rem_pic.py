@@ -306,6 +306,8 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
         mu_total = []
         std_total = []
 
+
+
         for slice_index in range(self.ns0,self.ns1):
 
             y_slice = y_slices[slice_index]
@@ -376,7 +378,9 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
             
 
             y_slice_m = (y_slice  - mu)*block_mask
-            _, y_slice_likelihood = self.gaussian_conditional(y_slice_m, scale*block_mask, training = training)
+            _, y_slice_likelihood = self.gaussian_conditional(y_slice_m, 
+                                                            scale*block_mask, 
+                                                            training = training)
             y_hat_slice = ste_round(y_slice - mu)*block_mask + mu
 
 
