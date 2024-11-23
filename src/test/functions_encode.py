@@ -125,8 +125,9 @@ def extract_all_bitsreams(model, x, y_hat_base, mu_base,std_base, q_list, y_chec
         std_total.append(scale)
 
 
+        r_slice_zero_mu = r_slice - mu
 
-        r_slice_quantize = model.gaussian_conditional.quantize(r_slice - mu,"symbols") #[1,nc,h,w]
+        r_slice_quantize = model.gaussian_conditional.quantize(r_slice_zero_mu,"symbols") #[1,nc,h,w]
         indexes_sl = model.gaussian_conditional.build_indexes(scale).int() #[1,ch,h,w]
 
         r_slice_quantize = r_slice_quantize.ravel().unsqueeze(0) #[1,1*ch*h*w] 
@@ -157,9 +158,10 @@ def extract_all_bitsreams(model, x, y_hat_base, mu_base,std_base, q_list, y_chec
 
 
     bitstream = []
+
     for j, qs in enumerate(q_list):
         #print("start encoding level ",qs)
-        #start_qs = time.time()
+        start_qs = time.time()
         q_end = qs*10
         q_init = 0 if j == 0 else q_list[j-1]
         #q_init = q_list[j-1]
@@ -167,27 +169,36 @@ def extract_all_bitsreams(model, x, y_hat_base, mu_base,std_base, q_list, y_chec
         init_length = int((q_init*shapes)/100) + 1 if j > 0 else 0 
         end_length =  int((q_end*shapes)/100) 
 
+
         r_hat_tbc = r_hat_slice_ordered[:,init_length:end_length + 1] #[10,init_l:end_l]
         ordered_index_bc = ordered_index[:,init_length:end_length + 1] #ddd
+
+
 
         symbols_list = torch.flatten(r_hat_tbc).unsqueeze(0) # [1,10*(end_length - init_length)]
         indexes_l = torch.flatten(ordered_index_bc).unsqueeze(0) # [1,10*K]
 
+
         symbols_q = model.gaussian_conditional.compress(symbols_list,
                                                              indexes_l,
                                                              already_quantize = True)
+
+        prova =     model.gaussian_conditional.decompress(symbols_q,
+                                                             indexes_l,
+                                                             )
+        
+        if j == 0:
+            print("prova a vedere ",torch.equal(prova,symbols_list))
+
         end_qs = time.time()
         #print("time for encoding is ",end_qs - start_qs)
         bitstream.append(symbols_q)
     
-    #ora inizia la parte di decoding 
-    # ordered_scale,std_ordering_index = torch.sort(scale_hat_slice, dim=0, descending=True) 
-    # ordered_index = torch.gather(index_hat_slice,dim = 0,index = std_ordering_index) #[10,ch*h*w]
-    """
-    print("here we decode the stuff just to see if it works")
-    print("TO DO:delete this part")
+
+    
     for j in range(len(bitstream)):
         qs =q_list[j]
+        symbols = bitstream[j]
 
         q_end = qs*10
         q_init = 0 if j == 0 else q_list[j-1]
@@ -195,18 +206,27 @@ def extract_all_bitsreams(model, x, y_hat_base, mu_base,std_base, q_list, y_chec
         init_length = int((q_init*shapes)/100) + 1 if j > 0 else 0 
         end_length =  int((q_end*shapes)/100) 
 
-        symbols = bitstream[j]
+        
         ordered_index_bc = ordered_index[:,init_length:end_length + 1] #ddd
         indexes_l = torch.flatten(ordered_index_bc).unsqueeze(0)
 
 
-        symbols_q = model.base_net.gaussian_conditional.decompress(symbols,
-                                                             indexes_l,
-                                                             already_quantize = True)
-        
 
-        r_hat_tbc = r_hat_tbc.reshape(1,10,-1)  #divido nelle sottosezioni
-    """
+        symbols_q = model.gaussian_conditional.decompress(symbols,
+                                                             indexes_l)
+
+
+        r_hat_tbc = symbols_q.float()#reshape(10,-1).unsqueeze(0).float()  #divido nelle sottosezioni
+        
+        #print("dec ",j," shape is ",r_hat_tbc.shape)
+
+
+
+    #print("check if it is the same (hope) ",r_dec[0].shape)
+    #print(torch.unique(r_dec[0],return_counts =True))
+    
+
+
     return bitstream, shapes
 
 

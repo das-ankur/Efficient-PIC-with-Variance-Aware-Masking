@@ -28,7 +28,7 @@ def extract_latents_from_bits(model,bitstreams,q_ind):
         latent_means_enh = model.h_mean_s[1](z_hat)
         latent_means = torch.cat([latent_means_base,latent_means_enh],dim = 1)
         latent_scales = torch.cat([latent_scales_base,latent_scales_enh],dim = 1) 
-    return latent_means, latent_scales, y_shape
+    return z_hat, latent_means, latent_scales, y_shape
 
 def extract_retrieve_entropy_parameters(current_index,model,mu_total,std_total, y_hat_slices_base,latent_means, latent_scales, y_shape):
     

@@ -10,7 +10,7 @@ import sys
 
 def main(argv):
 
-    q_levs = [0,0.02,0.05,0.5,0.75,1,1.5,2,2.5,3,4,5,5.5,6,6.6,10] 
+    q_levs = [0.02,0.05,0.5,0.75,1,1.5,2,2.5,3,4,5,5.5,6,6.6,10] 
     args = parse_args_demo(argv)
     print(args)
     if args.wandb:
@@ -47,7 +47,6 @@ def main(argv):
     print("time for encoding")
     sec_to_hours(end_enc - start_enc)
 
-    return 0
 
     bitstreams["unpad"] = unpad
 

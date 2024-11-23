@@ -51,15 +51,17 @@ def decode_base(model, bits, latent_means, latent_scales, z_hat):
     #x_hat = model.g_s[0](y_hat_b).clamp_(0, 1) if model.multiple_decoder else model.g_s(y_hat_b).clamp_(0, 1)
     scales = torch.cat(scales_base,dim = 1)
     mus = torch.cat(mu_base,dim = 1)
-
+    print("lo shape issss: ",y_hat_b.shape)
     return {"y_hat": y_hat_b, "scale":scales,"mu":mus}
 
 def decode(model, bitstreams, shape, q_ind = 0, y_hat_base = None):
 
     q_list = bitstreams["q_list"]
-    assert q_ind < len(q_list)
 
-    latent_means, latent_scales, y_shape = extract_latents_from_bits(model, bitstreams, q_ind)
+
+    assert q_ind < len(q_list)
+    #z_hat = model.entropy_bottleneck.decompress(bitstreams["z"], bitstreams["shape"])
+    z_hat, latent_means, latent_scales, y_shape = extract_latents_from_bits(model, bitstreams, q_ind)
 
 
     mu_total = []
@@ -67,11 +69,14 @@ def decode(model, bitstreams, shape, q_ind = 0, y_hat_base = None):
 
 
 
-    if y_hat_base is not None:
-        res_base = decode_base(model, latent_means, latent_scales, bitstreams["base"])
+    if y_hat_base is  None:
+        res_base = decode_base(model, latent_means, latent_scales, bitstreams["base"], z_hat = z_hat)
         y_hat_base = res_base["y_hat"]
 
+        
+
     if q_ind == 0:
+        print("y hat base shape: ",y_hat_base.shape)
         x_hat = model.g_s[0](y_hat_base).clamp_(0, 1) if model.multiple_decoder else model.g_s(y_hat_base).clamp_(0, 1)
         return {"x_hat":x_hat,"y_hat":y_hat_base}
     
@@ -140,17 +145,17 @@ def decode(model, bitstreams, shape, q_ind = 0, y_hat_base = None):
 
         symbols_q = model.gaussian_conditional.decompress(symbols,
                                                              indexes_l,
-                                                             already_quantize = True) #[1,10*(end_length - init_length)]
+                                                             ) #[1,10*(end_length - init_length)]
         
-        symbols_q = symbols_q.to("cuda")
-        r_hat_tbc = symbols_q.reshape(1,10,-1)  #[1,10,(end_length - init_length)]
+        symbols_q = symbols_q.to("cuda").squeeze(0).float()
+        r_hat_tbc = symbols_q.reshape(10,-1).unsquee(0)  #[1,10,(end_length - init_length)]
 
         r_decode.append(r_hat_tbc)
     
     r_decode = torch.cat(r_decode,dim = 1) # [10, Ndecoded]
     r_shape = r_decode.shape[1]
 
-    r_dec[:, :r_shape] = r_decode #[10, ch*w*h]
+    r_dec[:, :r_shape] = r_decode #insert decoded values in the tensor, letting the mean for the other elements
 
     r_dec = torch.gather(r_dec, dim=1, index=inverse_indices) #[10,ch*w*h]
 
