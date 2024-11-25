@@ -66,12 +66,15 @@ def train_one_epoch(model,
 
 
             if rems is None:
-                out_criterion = criterion(out_net, d) 
+                out_net = model.forward_single_quality(d, quality = quality, training = True)
             else:
                 quality_ref = extract_quality_ref(quality,rems)
                 with torch.no_grad():
-                    checkpoint_ref = model.ExtractChekpointRepr(d,quality =  quality_ref,rc = False )
-                    out_criterion = model.forward_single_quality(out_net, d, checkpoint_ref)
+                    checkpoint_rep = model.ExtractChekpointRepr(d,quality =  quality_ref,rc = False )
+                    out_net = model.forward_single_quality(d,
+                                                        quality = quality, 
+                                                        training = True,
+                                                        checkpoint_rep = checkpoint_rep)
 
             if lmbda_list is None:                                                                    
                 out_criterion = criterion(out_net, d)
@@ -129,7 +132,14 @@ def train_one_epoch(model,
 
 
 
-def valid_epoch(epoch, test_dataloader,criterion, model, pr_list = [0.05], wandb_log = True, lmbda_list=None):
+def valid_epoch(epoch, 
+                test_dataloader, 
+                criterion, 
+                model, 
+                pr_list = [0.05], 
+                wandb_log = True, 
+                lmbda_list=None, 
+                rems = None):
     #pr_list =  [0] +  pr_list  + [-1]
     model.eval()
     device = next(model.parameters()).device
@@ -146,8 +156,19 @@ def valid_epoch(epoch, test_dataloader,criterion, model, pr_list = [0.05], wandb
 
             d = d.to(device)
             for j,p in enumerate(pr_list):
+                if rems is None:
+                    out_net = model.forward_single_quality(d, quality = quality, training = False)
+                else:
+                    quality_ref = extract_quality_ref(p,rems)
+                    checkpoint_rep = model.ExtractChekpointRepr(d,
+                                                                quality =  quality_ref,
+                                                                rc = False )
+                    out_net = model.forward_single_quality(d,
+                                                        quality = p, 
+                                                        training = False,
+                                                        checkpoint_rep = checkpoint_rep)
 
-                out_net = model.forward_single_quality(d, quality = p, training = False, mask_pol = "point-based-std")
+
                 psnr_im = compute_psnr(d, out_net["x_hat"])
 
 
@@ -160,9 +181,7 @@ def valid_epoch(epoch, test_dataloader,criterion, model, pr_list = [0.05], wandb
                 bpp = out_criterion["bpp_loss"]
                 loss.update(out_criterion["loss"].clone().detach())
                 bpp_loss.update(bpp)
-
-         
-
+        
     if wandb_log: 
         log_dict = {
                 "valid":epoch,
@@ -181,7 +200,12 @@ def valid_epoch(epoch, test_dataloader,criterion, model, pr_list = [0.05], wandb
 
 
 
-def test_epoch(epoch, test_dataloader, model, pr_list, wandb_log = False):
+def test_epoch(epoch, 
+            test_dataloader, 
+            model, 
+            pr_list,
+            criterion, 
+            rems = None):
     model.eval()
     device = next(model.parameters()).device
 
@@ -194,37 +218,22 @@ def test_epoch(epoch, test_dataloader, model, pr_list, wandb_log = False):
         for d,_ in test_dataloader:
             d = d.to(device)
             for j,p in enumerate(pr_list):
-                out_net = model.forward_single_quality(d, quality = p, training = False,  mask_pol = "point-based-std")
+                if rems is None:
+                    out_net = model.forward_single_quality(d, quality = quality, training = False)
+                else:
+                    quality_ref = extract_quality_ref(p,rems)
+                    checkpoint_rep = model.ExtractChekpointRepr(d,
+                                                                quality =  quality_ref,
+                                                                rc = False )
+                    out_net = model.forward_single_quality(d,
+                                                        quality = p, 
+                                                        training = False,
+                                                        checkpoint_rep = checkpoint_rep)
 
-                psnr_im = compute_psnr(d, out_net["x_hat"])
-                batch_size_images, _, H, W =d.size()
-                num_pixels = batch_size_images * H * W
-                denominator = -math.log(2) * num_pixels #dddd
-                likelihoods = out_net["likelihoods"]
-                bpp = ((torch.log(likelihoods["y"]).sum())  + (torch.log(likelihoods["z"]).sum()))/denominator
-
-
-                psnr[j].update(psnr_im)
-                bpp_loss[j].update(bpp)
-
-
-    if wandb_log:
-        for i in range(len(pr_list)):
-            if i== 0:
-                name = "test_base"
-            elif i == len(pr_list) - 1:
-                name = "test_complete"
-            else:
-                c = str(pr_list[i])
-                name = "test_quality_" + c 
-            
-            log_dict = {
-                name:epoch,
-                name + "/bpp":bpp_loss[i].avg,
-                name + "/psnr":psnr[i].avg,
-                }
-
-            wandb.log(log_dict)
+                
+                out_criterion = criterion(out_net, d)
+                psnr[j].update(compute_psnr(d, out_net["x_hat"]))
+                bpp_loss[j].update(out_criterion["bpp_loss"])
 
     return [bpp_loss[i].avg for i in range(len(bpp_loss))], [psnr[i].avg for i in range(len(psnr))]
 
@@ -233,12 +242,23 @@ def test_epoch(epoch, test_dataloader, model, pr_list, wandb_log = False):
 #######################################################################################################################################
 #######################################################################################################################################
 #######################################################################################################################################
+def ReadAndPadImage(d,device):
+    x = read_image(d).to(device)
+    x = x.unsqueeze(0) 
+    h, w = x.size(2), x.size(3)
+    pad, unpad = compute_padding(h, w, min_div=2**6)  # pad to allow 6 strides of 2
+    x_padded = F.pad(x, pad, mode="constant", value=0)
+    return x, x_padded, unpad
+        
+
 def compress_with_ac(model,  
                     filelist, 
                     device, 
                     pr_list = [0.05,0.01], 
                     mask_pol = None, 
                     writing = None, 
+                    rems = None,
+                    rc = False,
                     save_images = False):
 
     l = len(pr_list)
@@ -254,26 +274,36 @@ def compress_with_ac(model,
         print("l'immagine d: ",d," ",i)
 
         with torch.no_grad():
-            x = read_image(d).to(device)
+
+            x, x_padded, unpad = ReadAndPadImage(d,device)
             nome_immagine = d.split("/")[-1].split(".")[0]
-            x = x.unsqueeze(0) 
-            h, w = x.size(2), x.size(3)
-            pad, unpad = compute_padding(h, w, min_div=2**6)  # pad to allow 6 strides of 2
-            x_padded = F.pad(x, pad, mode="constant", value=0)
-        
 
             for j,p in enumerate(pr_list):
                 
                 lev = "level_" + str(j)
 
+                if rems is None:
+                    checkpoint_rep = None
+                else:
+                    quality_ref = extract_quality_ref(quality,rems)
+                    checkpoint_rep = model.ExtractChekpointRepr(x_padded,
+                                                                quality =  quality_ref,
+                                                                rc = rc )
                 
 
-                data =  model.compress(x_padded, quality =p, mask_pol = mask_pol,)
-                #if j%8==0:
-                #    print(sum(len(s[0]) for s in data["strings"][0]))
+                data =  model.compress(x_padded, 
+                                    quality =p, 
+                                    mask_pol = mask_pol,
+                                    checkpoint_rep = checkpoint_rep)
+
                 start = time.time()
-                out_dec = model.decompress(data["strings"], data["shape"], quality = p,mask_pol = mask_pol)
+                out_dec = model.decompress(data["strings"],
+                                            data["shape"], 
+                                            quality = p,
+                                            mask_pol = mask_pol,
+                                            checkpoint_rep = None)
                 end = time.time()
+
                 #print("Runtime of the epoch:  ", epoch)
                 decoded_time = end-start
                 #sec_to_hours(end - start) 

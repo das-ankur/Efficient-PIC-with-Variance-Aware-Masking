@@ -355,7 +355,7 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
             y_b_hat = y_checkpoint_hat[current_index]
             y_b_hat.requires_grad = True
 
-            quality_bar, _  = self.find_check_quality(quality)
+            quality_bar, quality_post  = self.find_check_quality(quality)
 
             block_mask =  self.masking(scale,pr = quality,mask_pol = mask_pol) # this is the q* in the original paper 
             block_mask = self.masking.apply_noise(block_mask, training)
@@ -572,6 +572,10 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
 
 
             if self.enable_rem:
+                exit_ = False 
+                refer_q = 0.0
+                while exit_ is False:
+
                 mu, scale = self.apply_latent_enhancement(current_index,
                                                         block_mask,
                                                         bar_mask,
