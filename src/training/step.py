@@ -9,6 +9,26 @@ import time
 import math 
 from torch.nn.functional import mse_loss
 
+
+def extract_quality_ref(quality, check_levels):
+
+    if quality <= check_levels[0]:
+        quality_ref = -1 
+
+    elif (len(check_levels) == 2 or len(check_levels) == 3)  and check_levels[0] < quality <= check_levels[1]:
+            quality_ref = check_levels[0]
+            #print("non dovrei mai entrare qua")
+    elif len(check_levels) == 2 and quality > check_levels[1]:
+        quality_ref = check_levels[1]
+        
+    elif len(check_levels)==3 and  check_levels[1] < quality <= check_levels[2]:
+        #print("non dovrei mai entrare qua")
+        quality_ref = check_levels[1] 
+    else:
+        #print("non dovrei mai entrare qua")
+        quality_ref = check_levels[-1]
+    return quality_ref
+
 def train_one_epoch(model, 
                     criterion, 
                     train_dataloader,
@@ -21,7 +41,7 @@ def train_one_epoch(model,
                       lmbda_list = None,
                       clip_max_norm = 1.0,
                       wandb_log = False,
-                      rems = False):
+                      rems = None):
     
     
     model.train()
@@ -44,8 +64,19 @@ def train_one_epoch(model,
             quality = list_quality[quality_index]
             out_net = model.forward_single_quality(d, quality = quality, training = True)
 
-            out_criterion = criterion(out_net, d) if lmbda_list is None  \
-                            else criterion(out_net, d, lmbda = lmbda_list[quality_index])
+
+            if rems is None:
+                out_criterion = criterion(out_net, d) 
+            else:
+                quality_ref = extract_quality_ref(quality,rems)
+                with torch.no_grad():
+                    checkpoint_ref = model.ExtractChekpointRepr(d,quality =  quality_ref,rc = False )
+                    out_criterion = model.forward_single_quality(out_net, d, checkpoint_ref)
+
+            if lmbda_list is None:                                                                    
+                out_criterion = criterion(out_net, d)
+            else:
+                criterion(out_net, d, lmbda = lmbda_list[quality_index])
         else:
             out_net = model(d, quality = list_quality)
             out_criterion = criterion(out_net, d)

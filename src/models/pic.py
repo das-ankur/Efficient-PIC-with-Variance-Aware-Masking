@@ -741,7 +741,7 @@ class VarianceMaskingPIC(CompressionModel):
             y_hat_slice = self.gaussian_conditional.quantize(y_slice, "symbols", mu) + mu
 
             y_strings.append(y_q_string)
-
+            
             lrp_support = torch.cat([mean_support,y_hat_slice], dim=1)
             lrp = self.lrp_transforms[idx](lrp_support)
             lrp = 0.5 * torch.tanh(lrp)

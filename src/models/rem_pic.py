@@ -118,7 +118,7 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
 
 
 
-    def extract_chekpoint_representation_from_images(self,x, quality,  rc = True): #fff
+    def ExtractChekpointRepr(self,x, quality,  rc = True): #fff
 
 
         out_latent = self.compress( x, 

@@ -12,7 +12,7 @@ def parse_args(argv):
 
     parser.add_argument("--clip_max_norm",default=1.0,type=float,help="gradient clipping max norm (default: %(default)s",)
     parser.add_argument("--code", type=str, default = "firstTrain", help="Batch size (default: %(default)s)")
-    parser.add_argument("--checkpoint", type=str, default = "none") #"/scratch/ResDSIC/demo/l2_train/2l_memdmh_mem5/_very_best.pth.tar"
+    parser.add_argument("--checkpoint", type=str, default = "/scratch/ResDSIC/demo/l2_train/2l_memdmh_mem5/_very_best.pth.tar") #"/scratch/ResDSIC/demo/l2_train/2l_memdmh_mem5/_very_best.pth.tar"
     parser.add_argument("--checkpoint_base", type=str, default = "none") #dddd
     parser.add_argument("--cuda", action="store_true", help="Use cuda")
     parser.add_argument("--check_levels", nargs='+', type=int, default = [0.05, 0.75, 2])

@@ -17,7 +17,8 @@ def parse_args_demo(argv):
     parser.add_argument("--path_save",type=str,default = "/scratch/ScalableResults/bits")
     parser.add_argument("--path_image",type=str,default = "/scratch/dataset/kodak/kodim12.png")
 
-
+    #requested_levels
+    parser.add_argument("--requested_levels", nargs='+', type=int, default = [0,1,2,3])
     parser.add_argument("--seed", type=float,default = 42, help="Set random seed for reproducibility")
     parser.add_argument("--wandb", action="store_true", help="Use cuda")
     args = parser.parse_args(argv) #dddd

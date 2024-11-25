@@ -14,6 +14,9 @@ def decode_base(model, bits, latent_means, latent_scales, z_hat):
 
     scales_base = []
     mu_base = []
+
+    #print("tipe mean---> ",type(latent_means))
+    #print("tipe scale ---> ",type(latent_scales))
     for slice_index in range(model.ns0): #ddd
         pr_strings = y_string[slice_index]
         idx = slice_index%model.ns0 #.num_slice_cumulative_list[0]
@@ -51,7 +54,7 @@ def decode_base(model, bits, latent_means, latent_scales, z_hat):
     #x_hat = model.g_s[0](y_hat_b).clamp_(0, 1) if model.multiple_decoder else model.g_s(y_hat_b).clamp_(0, 1)
     scales = torch.cat(scales_base,dim = 1)
     mus = torch.cat(mu_base,dim = 1)
-    print("lo shape issss: ",y_hat_b.shape)
+    #print("lo shape issss: ",y_hat_b.shape)
     return {"y_hat": y_hat_b, "scale":scales,"mu":mus}
 
 def decode(model, bitstreams, shape, q_ind = 0, y_hat_base = None):
@@ -67,16 +70,16 @@ def decode(model, bitstreams, shape, q_ind = 0, y_hat_base = None):
     mu_total = []
     std_total = []
 
-
+    #print("in input che succede: ",type(latent_scales))
 
     if y_hat_base is  None:
-        res_base = decode_base(model, latent_means, latent_scales, bitstreams["base"], z_hat = z_hat)
+        res_base = decode_base(model,bitstreams["base"], latent_means, latent_scales, z_hat = z_hat)
         y_hat_base = res_base["y_hat"]
 
         
 
     if q_ind == 0:
-        print("y hat base shape: ",y_hat_base.shape)
+        #print("y hat base shape: ",y_hat_base.shape)
         x_hat = model.g_s[0](y_hat_base).clamp_(0, 1) if model.multiple_decoder else model.g_s(y_hat_base).clamp_(0, 1)
         return {"x_hat":x_hat,"y_hat":y_hat_base}
     
@@ -101,8 +104,11 @@ def decode(model, bitstreams, shape, q_ind = 0, y_hat_base = None):
                                                             latent_scales,
                                                             y_shape)
         mean_support_slices.append(mean_support)
+
+        #print("la mu ha questa dimensine: ",slice_index," ",mu.shape," ",mu.ravel().unsqueeze(0).shape)
         mean.append(mu.ravel().unsqueeze(0))
         mu_total.append(mu_t)
+        
         std_total.append(scale)
         indexes_sl = model.gaussian_conditional.build_indexes(scale).int() #[1,ch,h,w] 
         indexes_sl = indexes_sl.ravel().unsqueeze(0) #[1,1*ch*h*w]
@@ -117,6 +123,8 @@ def decode(model, bitstreams, shape, q_ind = 0, y_hat_base = None):
     scale_hat_slice = torch.cat(scale_slices,dim = 0) # [10,ch*h*w]
     mean = torch.cat(mean,dim = 0)
 
+    #print("la media ha questa dimensione: ",mean.shape)
+
     #ora inizia la parte di decoding 
     ordered_scale,std_ordering_index = torch.sort(scale_hat_slice, dim=1, descending=True) 
     ordered_index = torch.gather(index_hat_slice,dim = 1,index = std_ordering_index) #[10,ch*h*w]
@@ -130,7 +138,9 @@ def decode(model, bitstreams, shape, q_ind = 0, y_hat_base = None):
 
 
     for j in range(q_ind):
+        
         qs =q_list[j]
+        #print("----- qs: ",qs)
 
         q_end = qs*10
         q_init = 0 if j == 0 else q_list[j-1]
@@ -138,7 +148,7 @@ def decode(model, bitstreams, shape, q_ind = 0, y_hat_base = None):
         init_length = int((q_init*shape)/100) + 1 #if j > 0 else 0 
         end_length =  int((q_end*shape)/100) 
 
-        symbols = bitstreams[j]
+        symbols = bitstreams["top"][j]
         ordered_index_bc = ordered_index[:,init_length:end_length + 1] #ddd
         indexes_l = torch.flatten(ordered_index_bc).unsqueeze(0)
 
@@ -148,29 +158,41 @@ def decode(model, bitstreams, shape, q_ind = 0, y_hat_base = None):
                                                              ) #[1,10*(end_length - init_length)]
         
         symbols_q = symbols_q.to("cuda").squeeze(0).float()
-        r_hat_tbc = symbols_q.reshape(10,-1).unsquee(0)  #[1,10,(end_length - init_length)]
+        r_hat_tbc = symbols_q.reshape(10,-1)#.unsqueeze(0)  #[1,10,(end_length - init_length)]
 
-        r_decode.append(r_hat_tbc)
-    
-    r_decode = torch.cat(r_decode,dim = 1) # [10, Ndecoded]
+        r_decode.append(r_hat_tbc) 
+    #print("r_decode 0 shape: ",r_decode[0].shape)
+
+
+    r_decode = torch.cat(r_decode,dim = 1).squeeze(0)# [10, Ndecoded]
+    #print("r_decode ciaoooo----> ",r_decode.shape)
+    #print("r_decode shape: ",r_decode.shape)
     r_shape = r_decode.shape[1]
 
+
+    #print("r shape: ",r_shape)
+    #print("rdec shape: ",r_dec.shape)
+    #print("r_decode shape: ",r_decode.shape)
     r_dec[:, :r_shape] = r_decode #insert decoded values in the tensor, letting the mean for the other elements
 
     r_dec = torch.gather(r_dec, dim=1, index=inverse_indices) #[10,ch*w*h]
 
-    r_dec = r_dec.reshape(10,y_shape[0],y_shape[1])#questo dovrebbe essere tutto!!!
-
+    r_dec = r_dec.reshape(10,32,y_shape[0],y_shape[1])#questo dovrebbe essere tutto!!!
+    #print("ottengo lo spazio latente di queste dimensiono: ",r_dec.shape)
     y_hat_slices = []
     for slice_index in range(model.ns0,model.ns1):
+        #print("£££££££££££ SLICE INDEX IS £££££££££££££: ",slice_index)
         current_index = slice_index%model.ns0
-        y_hat_slice = r_dec[current_index]
+        y_hat_slice = r_dec[current_index].unsqueeze(0)
+        #print("y_hat_slice at ",current_index," has this dim ",y_hat_slice.shape)
 
 
-        mean_support = mean_support_slices[current_index]        
+        mean_support = mean_support_slices[current_index]   
+        #print("la mean support per ",current_index," is ",mean_support.shape)
         lrp_support = torch.cat([mean_support,y_hat_slice], dim=1)
         lrp = model.lrp_transforms_prog[current_index](lrp_support)
         lrp = 0.5 * torch.tanh(lrp)
+        #print("lrp shape is ",lrp.shape)
         y_hat_slice += lrp   
 
         y_hat_slice = model.merge(y_hat_slice,y_hat_slices_base[current_index])
@@ -179,6 +201,7 @@ def decode(model, bitstreams, shape, q_ind = 0, y_hat_base = None):
     
 
     y_hat_en = torch.cat(y_hat_slices,dim = 1)
+    #print("Y HAT ENHANCED DIMENSION IS: ",y_hat_en.shape)
     if model.multiple_decoder:
         x_hat = model.g_s[1](y_hat_en)
     else:

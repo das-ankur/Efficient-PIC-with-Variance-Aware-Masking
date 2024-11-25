@@ -10,7 +10,7 @@ def read_and_pads_image(d,device):
     h, w = x.size(2), x.size(3)
     pad, unpad = compute_padding(h, w, min_div=2**6)  # pad to allow 6 strides of 2
     x_padded = F.pad(x, pad, mode="constant", value=0)
-    return x_padded, unpad
+    return x, x_padded, unpad
 
 
 def extract_latents_from_bits(model,bitstreams,q_ind):
@@ -28,6 +28,8 @@ def extract_latents_from_bits(model,bitstreams,q_ind):
         latent_means_enh = model.h_mean_s[1](z_hat)
         latent_means = torch.cat([latent_means_base,latent_means_enh],dim = 1)
         latent_scales = torch.cat([latent_scales_base,latent_scales_enh],dim = 1) 
+
+   
     return z_hat, latent_means, latent_scales, y_shape
 
 def extract_retrieve_entropy_parameters(current_index,model,mu_total,std_total, y_hat_slices_base,latent_means, latent_scales, y_shape):

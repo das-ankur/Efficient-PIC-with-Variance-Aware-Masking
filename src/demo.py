@@ -3,7 +3,7 @@ import wandb
 from test import parse_args_demo, read_and_pads_image, encode,  decode
 import time 
 from models import get_model
-from utility import sec_to_hours
+from utility import sec_to_hours, compute_psnr
 import torch.nn.functional as F 
 import sys
 
@@ -34,7 +34,7 @@ def main(argv):
     path_save = args.path_save
     path_image = args.path_image
     name_image = path_image.split("/")[-1].split(".")[0]
-    x_padded, unpad = read_and_pads_image(path_image,device)
+    x, x_padded, unpad = read_and_pads_image(path_image,device)
 
     ql = [0] + q_levs
     for i,c in enumerate(ql):
@@ -64,13 +64,18 @@ def main(argv):
 
 
     for qk in args.requested_levels:
-        print("decoding qk")
+        print("decoding qk=====> ",qk)
         start_dec_time = time.time()
         recs  = decode(net, bitstreams, shape, q_ind = qk, y_hat_base=y_hat_base)
         end_dec_time = time.time()
         print("time for decoding: ",sec_to_hours(end_dec_time - start_dec_time))
         recs["x_hat"] = F.pad(recs["x_hat"], unpad)
-        recs["x_hat"].clamp_(0.,1.)   
+        recs["x_hat"].clamp_(0.,1.)  
+        psnr_im = compute_psnr(x, recs["x_hat"])
+        print("the psnr is ",psnr_im)
+
+        
+
         
     
 
