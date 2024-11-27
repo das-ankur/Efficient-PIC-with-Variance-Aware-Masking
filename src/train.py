@@ -13,7 +13,7 @@ from training import ScalableRateDistortionLoss, RateDistortionLoss, DistortionL
 from training import compress_with_ac, train_one_epoch, valid_epoch, test_epoch
 import os
 import sys
-import numpy as np
+import numpy as np #ciaos
 
 
 
