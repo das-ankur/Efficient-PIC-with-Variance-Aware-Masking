@@ -622,7 +622,7 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
         
 
 
-        mask_pol = self.mask_policy if mask_pol is None else mask_pol
+        mask_pol = self.mask_policy if mask_pol is None else mask_pol #ddd
 
 
         start_t = time.time()
