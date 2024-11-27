@@ -12,10 +12,11 @@ def parse_args(argv):
 
     parser.add_argument("--clip_max_norm",default=1.0,type=float,help="gradient clipping max norm (default: %(default)s",)
     parser.add_argument("--code", type=str, default = "firstTrain", help="Batch size (default: %(default)s)")
-    parser.add_argument("--checkpoint", type=str, default = "/scratch/ResDSIC/demo/l2_train/2l_memdmh_mem5/_very_best.pth.tar") #"/scratch/ResDSIC/demo/l2_train/2l_memdmh_mem5/_very_best.pth.tar"
+    parser.add_argument("--checkpoint", type=str, default = "/scratch/WACV/models/DecodeRefineLRPBIS/_very_best.pth.tar") #"/scratch/ResDSIC/demo/l2_train/2l_memdmh_mem5/_very_best.pth.tar"
     parser.add_argument("--checkpoint_base", type=str, default = "none") #dddd
     parser.add_argument("--cuda", action="store_true", help="Use cuda")
-    parser.add_argument("--check_levels", nargs='+', type=int, default = [0.05, 0.75, 2])
+    parser.add_argument("--check_levels", nargs='+', type=float, default = [0.75])
+    parser.add_argument("--check_levels_np", nargs='+', type=int, default = [200])
 
     parser.add_argument("--division_dimension", nargs='+', type=int, default = [320, 640])
     parser.add_argument( "--dim_chunk", type=int, default=32, help="dim chunk")
@@ -34,13 +35,13 @@ def parse_args(argv):
     parser.add_argument("--multiple_decoder", action="store_true", help="Use cuda")
     parser.add_argument("--multiple_encoder", action="store_true", help="Use cuda")
     parser.add_argument("--multiple_hyperprior", action="store_true", help="Use cuda")
-    parser.add_argument("-m","--model",default="pic",choices=models.keys(),help="Model architecture (default: %(default)s)",)    
+    parser.add_argument("-m","--model",default="rem",choices=models.keys(),help="Model architecture (default: %(default)s)",)    
     parser.add_argument("--M", type=int, default=640, help="M")
     parser.add_argument("--mu_std", action="store_true", help="use entire mu as input")
 
 
     parser.add_argument("-n","--num-workers",type=int,default=8,help="Dataloaders threads (default: %(default)s)",) #u_net_post
-    parser.add_argument("--num_images", type=int, default=300000, help="num images") #ddddddd
+    parser.add_argument("--num_images", type=int, default=5000, help="num images") #ddddddd
     parser.add_argument("--num_images_val", type=int, default=816, help="Batch size (default: %(default)s)")
     parser.add_argument("--N", type=int, default=192, help="N")#ddddd#ddd
     parser.add_argument("--num_points", type=int, default=100, help="num points per segments")
@@ -63,7 +64,7 @@ def parse_args(argv):
     parser.add_argument("--test_before", action="store_true", help="test before start training")
     parser.add_argument("--training_dataset",  type=str, default = "/scratch/dataset/openimages", help="project name for wandb")
     parser.add_argument("--test_dataset",  type=str, default = "/scratch/dataset/kodak", help="test path")
-    parser.add_argument("--training_type",  type=str, default = "fist_train", help="type of test")
+    parser.add_argument("--training_type",  type=str, default = "rems", help="type of test")
     #training_type
 
     parser.add_argument("--valid_batch_size",type=int,default=16,help="Test batch size (default: %(default)s)",)

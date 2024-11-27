@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 from dataset import ImageFolder, TestKodakDataset
 from models import get_model
-from training import ScalableRateDistortionLoss, RateDistortionLoss, DistortionLoss
+from training import ScalableRateDistortionLoss, RateDistortionLoss, DistortionLoss, RateLoss
 from training import compress_with_ac, train_one_epoch, valid_epoch, test_epoch
 import os
 import sys
@@ -90,6 +90,18 @@ def main(argv):
         print("entro in checkpoint")
         checkpoint = torch.load(args.checkpoint, map_location="cuda")
         #print("vedo il checkpoint: ",checkpoint)
+        
+
+        
+        if args.model == "rem":
+            print("entro qua!")
+            checkpoint["args"].check_levels =  args.check_levels
+            checkpoint["args"].mu_std =  args.mu_std
+            checkpoint["args"].dimension =  args.dimension    
+            
+        print("qua è il nuovo args con cui imposto il modello!! ", checkpoint["args"]) 
+                   
+        
         checkpoint["args"].model = args.model
         args_save = checkpoint["args"]
         net = get_model(checkpoint["args"],device)
@@ -118,6 +130,8 @@ def main(argv):
         criterion = ScalableRateDistortionLoss(lmbda_list=args.lmbda_list)
     elif args.training_type == "refine_gs_ga":
         criterion = RateDistortionLoss()
+    elif args.training_type == "rems":
+        criterion = RateLoss()
     else:
         criterion = DistortionLoss()
 
@@ -129,14 +143,15 @@ def main(argv):
     if args.training_type == "first_train":
         list_quality = [0,10]
         lmbda_list = None
+        rems = None
     elif args.training_type == "refine_gs":
 
         print("entro qua per il list_pr")
         list_pr_1 = list(np.arange(0.015,1.5 ,(1.5 - 0.025)/200)) + [1.5]
         list_pr_2 = list(np.arange(1.6,10 ,(10 - 1.6)/50)) + [10]
         list_quality = list_pr_1 + list_pr_2
-
         lmbda_list = None
+        rems = args.check_levels
     elif args.training_type == "refine_gs_ga":
         list_pr_1 = list(np.arange(0.015,1.5 ,(1.5 - 0.025)/200)) + [1.5]
         list_pr_2 = list(np.arange(1.6,10 ,(10 - 1.6)/50)) + [10]
@@ -144,20 +159,38 @@ def main(argv):
         start = torch.log10(torch.tensor(args.lmbda_list[0]))
         end = torch.log10(torch.tensor(args.lmbda_list[1]))
         lmbda_list = torch.logspace(start, end, steps=len(list_quality) + 1)[1:]
-        
+        rems = None
+    
+    elif args.training_type == "rems":
+        list_quality = []
+        check_levels = args.check_levels + [10]
+        for i in range(len(check_levels) - 1):
+            sequent = check_levels[i + 1]
+            current = check_levels[i]
+            if i == 0:
+                list_pr_1 = list(np.arange(current + 0.01,sequent ,(sequent - current)/args.check_levels_np[i])) 
+            else:
+                list_pr_1 = list(np.arange(current,sequent ,(sequent - current)/args.check_levels_np[i])) 
+            list_quality.extend(list_pr_1) 
+        list_quality = [round(x, 4) for x in list_quality] 
+        if 10 not in list_quality:
+            list_quality.extend([10])
+        lmbda_list = None
+        rems = args.check_levels
     else:
         raise NotImplementedError()
 
     if args.checkpoint != "none" and args.test_before:
         pr_list = [0,0.05,0.1,0.25,0.5,0.6,0.75,1,1.25,2,3,5,10] 
         mask_pol = "point-based-std"
-
+        if args.model == "rem":
+            net.enable_rem = [False for i in range(len(net.check_levels))]
         bpp_init, psnr_init,_ = compress_with_ac(net, #net 
                                         filelist, 
                                         device,
                                         pr_list =pr_list,  
                                         mask_pol = mask_pol)
-    
+        net.enable_rem = [True for i in range(len(net.check_levels))]
         print("----> ",bpp_init," ",psnr_init) 
     
 
@@ -171,6 +204,8 @@ def main(argv):
         net.freeze_all()
         net.unfreeze_decoder()
         net.unfreeze_encoder()  
+    elif args.training_type == "rems":
+        net.unfreeze_rems()
 
     print("************************************************************")
     print("********************** START TRAINING **********************")
@@ -179,7 +214,7 @@ def main(argv):
     print("************************************************************")
     print("********************** START TRAINING **********************")
     print("************************************************************")     
-    
+
 
     for epoch in range(last_epoch, args.epochs):
         print("******************************************************")
@@ -198,6 +233,7 @@ def main(argv):
                                       list_quality= list_quality,
                                       sampling_training = args.sampling_training,
                                       lmbda_list=lmbda_list,
+                                      rems = rems,
                                       wandb_log = args.wandb_log_train)
             
         print("finito il train della epoca")
@@ -218,6 +254,7 @@ def main(argv):
                         criterion, 
                         net,
                         pr_list = [0,10],
+                        rems = rems,
                         wandb_log = args.wandb_log,
                         lmbda_list=lmbda_list) 
         lr_scheduler.step(loss)
@@ -225,11 +262,13 @@ def main(argv):
 
         list_pr = [0,0.05,0.1,0.25,0.5,0.6,0.75,1,1.25,2,3,5,10] 
         mask_pol = "point-based-std"
-        bpp_t, psnr_t = test_epoch(epoch, 
-                       test_dataloader,
-                       net, 
+        bpp_t, psnr_t = test_epoch( 
+                       test_dataloader = test_dataloader,
+                       model = net, 
+                       criterion = criterion,
                        pr_list = list_pr,
-                       wandb_log = args.wandb_log
+                       wandb_log = args.wandb_log,
+                       rems = rems
                        )
         print("finito il test della epoca: ",bpp_t," ",psnr_t)
 

@@ -175,7 +175,6 @@ class DistortionLoss(nn.Module):
             out["bpp_scalable"] = (torch.log(likelihoods["y_prog"]).sum()).sum()/denominator 
             out["bpp_loss"] = out["bpp_scalable"] +  out["bpp_base"] + batch_size_recon*(out["bpp_hype"])
         else: 
-            #print("porovo a enrare quaQQQQ")
             out["bpp_base"] = (torch.log(likelihoods["y"].squeeze(0)).sum())/denominator
             out["bpp_scalable"] = ((torch.log(likelihoods["y"]).sum()).sum()/denominator)*0.0
             out["bpp_loss"] = out["bpp_scalable"] + out["bpp_base"] + batch_size_recon*(out["bpp_hype"]) #dddd
@@ -193,8 +192,9 @@ class RateLoss(nn.Module):
         super().__init__()
         self.weight = weight
         self.device = device
+        self.mse = nn.MSELoss()
         
-    def forward(self,output,target): 
+    def forward(self,output,target, lmbda = 1e-2): 
 
         batch_size_images, _, H, W = target.size()
         out = {}
@@ -218,13 +218,8 @@ class RateLoss(nn.Module):
         denominator = -math.log(2) * num_pixels 
         likelihoods = output["likelihoods"]
         out["bpp_hype"] =  (torch.log(likelihoods["z"]).sum())/denominator
-
-
-
         out["bpp_base"] = torch.log(likelihoods["y"].squeeze(0)).sum()/denominator
-
-        out["bpp_loss"] =  out["bpp_base"] + batch_size_recon*(out["bpp_hype"]) 
-
+        out["bpp_loss"] =  out["bpp_base"] + (out["bpp_hype"]) 
         #out["loss"] = self.weight*(out["mse_loss"]).mean() 
         out["loss"] = out["bpp_loss"]
         return out

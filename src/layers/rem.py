@@ -84,7 +84,7 @@ class LatentRateReduction(nn.Module):
                     ResidualBlock( N, N),
                     )
                 
-                self.enc_enh_entropy_params = Seq(
+                self.enc_progressive_entropy_params = Seq(
                     ResidualBlock(2 * N if self.mu_std else N ,  N),
                     ResidualBlock( N, N),
                     )

@@ -74,7 +74,7 @@ def train_one_epoch(model,
                     out_net = model.forward_single_quality(d,
                                                         quality = quality, 
                                                         training = True,
-                                                        checkpoint_rep = checkpoint_rep)
+                                                        checkpoint_ref = checkpoint_rep)
 
             if lmbda_list is None:                                                                    
                 out_criterion = criterion(out_net, d)
@@ -149,7 +149,7 @@ def valid_epoch(epoch,
     mse_lss = AverageMeter() 
     
     psnr = AverageMeter() 
-    mutual_info = AverageMeter()
+
 
     with torch.no_grad():
         for d in test_dataloader:
@@ -157,7 +157,7 @@ def valid_epoch(epoch,
             d = d.to(device)
             for j,p in enumerate(pr_list):
                 if rems is None:
-                    out_net = model.forward_single_quality(d, quality = quality, training = False)
+                    out_net = model.forward_single_quality(d, quality = p, training = False)
                 else:
                     quality_ref = extract_quality_ref(p,rems)
                     checkpoint_rep = model.ExtractChekpointRepr(d,
@@ -166,7 +166,7 @@ def valid_epoch(epoch,
                     out_net = model.forward_single_quality(d,
                                                         quality = p, 
                                                         training = False,
-                                                        checkpoint_rep = checkpoint_rep)
+                                                        checkpoint_ref = checkpoint_rep)
 
 
                 psnr_im = compute_psnr(d, out_net["x_hat"])
@@ -200,7 +200,7 @@ def valid_epoch(epoch,
 
 
 
-def test_epoch(epoch, 
+def test_epoch(
             test_dataloader, 
             model, 
             pr_list,
@@ -212,14 +212,14 @@ def test_epoch(epoch,
 
     bpp_loss =[AverageMeter()  for _ in range(len(pr_list))] 
     psnr = [AverageMeter()  for _ in range(len(pr_list))]
-    mutual_info = [AverageMeter()  for _ in range(len(pr_list))]
+
 
     with torch.no_grad():
         for d,_ in test_dataloader:
             d = d.to(device)
             for j,p in enumerate(pr_list):
                 if rems is None:
-                    out_net = model.forward_single_quality(d, quality = quality, training = False)
+                    out_net = model.forward_single_quality(d, quality = p, training = False)
                 else:
                     quality_ref = extract_quality_ref(p,rems)
                     checkpoint_rep = model.ExtractChekpointRepr(d,
@@ -228,7 +228,7 @@ def test_epoch(epoch,
                     out_net = model.forward_single_quality(d,
                                                         quality = p, 
                                                         training = False,
-                                                        checkpoint_rep = checkpoint_rep)
+                                                        checkpoint_ref = checkpoint_rep)
 
                 
                 out_criterion = criterion(out_net, d)

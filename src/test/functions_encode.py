@@ -160,40 +160,43 @@ def extract_all_bitsreams(model, x, y_hat_base, mu_base,std_base, q_list, y_chec
     bitstream = []
 
     for j, qs in enumerate(q_list):
-        #print("start encoding level ",qs)
-        start_qs = time.time()
+
+        
         q_end = qs*10
         q_init = 0 if j == 0 else q_list[j-1]
-        #q_init = q_list[j-1]
         q_init = q_init*10
         init_length = int((q_init*shapes)/100) + 1 if j > 0 else 0 
         end_length =  int((q_end*shapes)/100) 
-
-
         r_hat_tbc = r_hat_slice_ordered[:,init_length:end_length + 1] #[10,init_l:end_l]
         ordered_index_bc = ordered_index[:,init_length:end_length + 1] #ddd
-
-
-
         symbols_list = torch.flatten(r_hat_tbc).unsqueeze(0) # [1,10*(end_length - init_length)]
         indexes_l = torch.flatten(ordered_index_bc).unsqueeze(0) # [1,10*K]
-
-
-        symbols_q = model.gaussian_conditional.compress(symbols_list,
-                                                             indexes_l,
-                                                             already_quantize = True)
-
-        prova =     model.gaussian_conditional.decompress(symbols_q,
-                                                             indexes_l,
-                                                             )
-        
-        if j == 0:
-            print("prova a vedere ",torch.equal(prova,symbols_list))
-
-        end_qs = time.time()
-        #print("time for encoding is ",end_qs - start_qs)
+        symbols_q = model.gaussian_conditional.compress(symbols_list,indexes_l,already_quantize = True)
+        prova =     model.gaussian_conditional.decompress(symbols_q,indexes_l)                                                    
         bitstream.append(symbols_q)
-    
+        """ approccio di riserva
+        q_init = 0 if j == 0 else q_list[j-1]
+        q_end = qs*10
+        delta_mask = model.masking(scale_hat_slice,q_init,q_end).ravel() #[10*ch*h*w] of ones and zeros
+        indexes_l = indexes_l.ravel()[delta_mask].unsqueeze(0) #[1,number of chosen elements]
+        symbols_list = r_hat_slice_ordered.ravel()[delta_mask].unsqueeze(0) #[1,number of chosen elements]
+        symbols_q = model.gaussian_conditional.compress(symbols_list,indexes_l,already_quantize = True)
+        bitstream.append(symbols_q)
+        # at decoding we have:
+        # obtained indexes_l with de3lta
+        #zeros_elements = torch.zeros_loike(total)
+        #indexes_l_decode = indexes_l.ravel()[delta_mask].unsqueeze(0) #[1,number of chosen elements]
+        #prova =     model.gaussian_conditional.decompress(bits_q,indexes_l)#[1,number of chosen elements]
+        # zeros_elements[delta_mask] = prova
+        """
+        
+        
+        
+
+
+
+
+
 
     
     for j in range(len(bitstream)):

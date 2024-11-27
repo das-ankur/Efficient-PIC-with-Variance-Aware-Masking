@@ -33,18 +33,19 @@ class ChannelMask(nn.Module):
         pr_bar = 1.0 - pr_bar
         res = torch.zeros_like(scale).to(scale.device)   
         for j in range(bs):
-            scale_b = scale[j,:,:,:]
+            scale_b = scale[j]#scale[j,:,:,:]
             scale_b = scale_b.ravel()
             quantile_bar = torch.quantile(scale_b, pr_bar)
             quantile = torch.quantile(scale_b, pr)
-            res_b = quantile_bar >= scale_b >= quantile #if "inverse" not in mask_pol else  scale_b <= quantile
+            res_b = quantile_bar >= scale_b > quantile #if "inverse" not in mask_pol else  scale_b <= quantile
             res_b = res_b.reshape(ch,w,h)
             res_b = res_b.to(scale.device)
-            res[j] = res_b             
+            res[j] = res_b   
+        return res.to(scale.device)          
 
 
-    def apply_noise(self, mask, tr):
-            if tr:
+    def apply_noise(self, mask, training):
+            if training:
                 mask = ste_round(mask)
             else:
                 mask = torch.round(mask)

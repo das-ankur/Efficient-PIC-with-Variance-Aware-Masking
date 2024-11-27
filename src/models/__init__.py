@@ -2,7 +2,9 @@ from .cnn import WACNN
 from .pic import VarianceMaskingPIC 
 from .rem_pic import VarianceMaskingPICREM
 
-models = {"cnn":WACNN,"pic":VarianceMaskingPIC,"rem":VarianceMaskingPICREM}
+models = {"cnn":WACNN,
+          "pic":VarianceMaskingPIC,
+          "rem":VarianceMaskingPICREM}
 
 
 
@@ -29,6 +31,7 @@ def get_model(args,device):
                                 all_scalable = args.all_scalable,
                         )         
     elif args.model == "rem":
+        
         net = models[args.model]( N = args.N,
                                 M = args.M,
                                 multiple_decoder = args.multiple_decoder,

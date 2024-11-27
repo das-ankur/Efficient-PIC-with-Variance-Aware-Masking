@@ -41,7 +41,7 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
         self.dimension = dimension
         self.check_levels = check_levels 
 
-        self.enable_rem = True # we start with enabling rems
+        self.enable_rem = [True for i in range(len(self.check_levels))] # we start with enabling rems
 
 
         self.check_multiple = len(self.check_levels)
@@ -64,7 +64,7 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
             for n,p in self.post_latent[i].named_parameters():
                 p.requires_grad = True      
 
-    def load_state_dict(self, state_dict):
+    def load_state_dict(self, state_dict, strict = True):
         # Carica i parametri del modello padre
         parent_state_dict = {k: v for k, v in state_dict.items() if k in self.state_dict() and 'post_latent' not in k}
         super().load_state_dict(parent_state_dict, strict=False)
@@ -77,6 +77,7 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
         else:
             print("This model does not have trained REMs.  self.enable_rem will be set to False")
             self.enable_rem = False
+
 
 
     def print_information(self):
@@ -155,26 +156,32 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
         if quality <= self.check_levels[0]:
             quality_ref = 0 
             quality_post = 0
+            right_index = -1
 
         elif (len(self.check_levels) == 2 or len(self.check_levels) == 3)  and self.check_levels[0] < quality <= self.check_levels[1]:
                 quality_ref = self.check_levels[0]
                 quality_post = self.check_levels[1]
+                right_index == 0 
         elif len(self.check_levels) == 2 and quality > self.check_levels[1]:
             quality_ref = self.check_levels[1]
             quality_post = 10
+            right_index = 1
         
         elif len(self.check_levels)==3 and  self.check_levels[1] < quality <= self.check_levels[2]:
             quality_ref = self.check_levels[1] 
             quality_post = self.check_levels[-1]
+            right_index = 1
         else:
             quality_ref = self.check_levels[-1]
             quality_post  = 10
-        return quality_ref, quality_post
+            right_index = -1
+        return quality_ref, quality_post, right_index
 
 
 
     def apply_latent_enhancement(self,
                                 current_index,
+                                right_index,
                                 block_mask,
                                 bar_mask,
                                 quality,
@@ -198,7 +205,8 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
         # in any case I do not improve anithing here!
         if quality <= self.check_levels[0]: #  in case nothing has to be done
             return mu, scale         
-
+        enhanced_params =  self.post_latent[right_index][current_index](y_b_hat, mu_scale_base, mu_scale_enh, attention_mask)
+        """
         if self.check_multiple == 1:
             enhanced_params =  self.post_latent[0][current_index](y_b_hat, mu_scale_base, mu_scale_enh, attention_mask)
         elif self.check_multiple == 2:
@@ -213,6 +221,7 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
             else:
                 index = 2 
             enhanced_params =  self.post_latent[index][current_index](y_b_hat, mu_scale_base, mu_scale_enh, attention_mask)   
+        """
         if self.mu_std:
                 mu,scale = enhanced_params.chunk(2,1)
                 return mu, scale
@@ -355,7 +364,7 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
             y_b_hat = y_checkpoint_hat[current_index]
             y_b_hat.requires_grad = True
 
-            quality_bar, quality_post  = self.find_check_quality(quality)
+            quality_bar, quality_post, right_index  = self.find_check_quality(quality)
 
             block_mask =  self.masking(scale,pr = quality,mask_pol = mask_pol) # this is the q* in the original paper 
             block_mask = self.masking.apply_noise(block_mask, training)
@@ -364,8 +373,10 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
             bar_mask = self.masking.apply_noise(bar_mask, training)
 
             
-            if self.enable_rem:
+            if self.enable_rem[right_index]:
+                
                 mu, scale = self.apply_latent_enhancement(current_index,
+                                                        right_index,
                                                         block_mask,
                                                         bar_mask,
                                                         quality,
@@ -404,8 +415,8 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
         std_prog = torch.cat(std_prog, dim = 1)#kkkk
 
         index = 0 if quality == 0 else 1
-        x_hat = self.g_s[index](y_hat).clamp_(0, 1) if self.multiple_decoder  \
-                else self.g_s(y_hat).clamp_(0, 1)
+        x_hat = self.g_s[index](y_hat_p).clamp_(0, 1) if self.multiple_decoder  \
+                else self.g_s(y_hat_p).clamp_(0, 1)
 
         return {
             "x_hat":x_hat,
@@ -560,7 +571,7 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
             
             
             
-            quality_bar,quality_post = self.find_check_quality(quality)
+            quality_bar,quality_post, right_index = self.find_check_quality(quality)
 
 
             block_mask = self.masking(scale,pr = quality,mask_pol = mask_pol)
@@ -571,12 +582,10 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
             bar_mask = self.masking.apply_noise(bar_mask, False)
 
 
-            if self.enable_rem:
-                exit_ = False 
-                refer_q = 0.0
-                while exit_ is False:
+            if self.enable_rem[right_index]:
 
                 mu, scale = self.apply_latent_enhancement(current_index,
+                                                        right_index,
                                                         block_mask,
                                                         bar_mask,
                                                         quality,
@@ -589,7 +598,6 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
                 
             index = self.gaussian_conditional.build_indexes(scale*block_mask).int()
             if real_compress:
-
                 y_q_string  = self.gaussian_conditional.compress((y_slice - mu)*block_mask, index)
                 y_strings.append(y_q_string)
                 y_hat_slice_nomu = self.gaussian_conditional.quantize((y_slice - mu)*block_mask, "dequantize") 
@@ -745,7 +753,7 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
 
             
                    
-            quality_bar,quality_post = self.find_check_quality(quality)
+            quality_bar,quality_post,right_index = self.find_check_quality(quality)
 
             block_mask = self.masking(scale,pr = quality,mask_pol = mask_pol) 
             bar_mask = self.masking(scale,pr = quality_bar,mask_pol = mask_pol)
@@ -754,8 +762,9 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
 
 
 
-            if self.enable_rem:
+            if self.enable_rem[right_index]:
                 mu, scale = self.apply_latent_enhancement(current_index,
+                                                          right_index,
                                                         post_mask,
                                                         bar_mask,
                                                         quality,
