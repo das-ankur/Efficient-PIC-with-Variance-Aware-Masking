@@ -41,14 +41,14 @@ def parse_args(argv):
 
 
     parser.add_argument("-n","--num-workers",type=int,default=8,help="Dataloaders threads (default: %(default)s)",) #u_net_post
-    parser.add_argument("--num_images", type=int, default=5000, help="num images") #ddddddd
+    parser.add_argument("--num_images", type=int, default=300000, help="num images") #ddddddd
     parser.add_argument("--num_images_val", type=int, default=816, help="Batch size (default: %(default)s)")
     parser.add_argument("--N", type=int, default=192, help="N")#ddddd#ddd
     parser.add_argument("--num_points", type=int, default=100, help="num points per segments")
 
 
     parser.add_argument("--patch-size",type=int,nargs=2,default=(256, 256),help="Size of the patches to be cropped (default: %(default)s)",)
-    parser.add_argument("--patience", type=int, default=8, help="patience")
+    parser.add_argument("--patience", type=int, default=12, help="patience")
     parser.add_argument("--project", type=str, default = "PIC", help="project name for wandb")
     
 

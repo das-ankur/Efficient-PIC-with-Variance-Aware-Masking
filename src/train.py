@@ -37,6 +37,8 @@ def main(argv):
         assert args.entity is not None
         if args.training_type == "first_train":
             wandb.init( config= args, project="PIC-SCRATCH", entity=args.entity)
+        elif args.training_type == "rems":
+            wandb.init( config= args, project="PIC-REMS", entity=args.entity)
         else:
             wandb.init( config= args, project=args.project, entity=args.entity)
     
