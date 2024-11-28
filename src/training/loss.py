@@ -219,6 +219,7 @@ class RateLoss(nn.Module):
         likelihoods = output["likelihoods"]
         out["bpp_hype"] =  (torch.log(likelihoods["z"]).sum())/denominator
         out["bpp_base"] = torch.log(likelihoods["y"].squeeze(0)).sum()/denominator
+        out["bpp_scalable"] = ((torch.log(likelihoods["y"]).sum()).sum()/denominator)*0.0
         out["bpp_loss"] =  out["bpp_base"] + (out["bpp_hype"]) 
         #out["loss"] = self.weight*(out["mse_loss"]).mean() 
         out["loss"] = out["bpp_loss"]

@@ -198,14 +198,18 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
         #star_mask = self.masking(scale,pr = quality,mask_pol = mask_pol)  
 
         attention_mask = block_mask - bar_mask 
-        attention_mask = self.masking.apply_noise(attention_mask,  training = False)   
-
+        #attention_mask.requires_grad = True
+ 
+        
         if self.mu_std:
             attention_mask = torch.cat([attention_mask,attention_mask],dim = 1)  
+
         # in any case I do not improve anithing here!
-        if quality <= self.check_levels[0]: #  in case nothing has to be done
+        if quality <= self.check_levels[0]: #  in case nothing has to be done dddd
             return mu, scale         
+
         enhanced_params =  self.post_latent[right_index][current_index](y_b_hat, mu_scale_base, mu_scale_enh, attention_mask)
+
         """
         if self.check_multiple == 1:
             enhanced_params =  self.post_latent[0][current_index](y_b_hat, mu_scale_base, mu_scale_enh, attention_mask)
@@ -293,9 +297,10 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
 
         if quality == 0: #and  slice_index == self.num_slice_cumulative_list[0] - 1:
             y_hat = torch.cat(y_hat_slices,dim = 1)
-            #x_hat = self.g_s[0](y_hat).clamp_(0, 1) if self.multiple_decoder else self.g_s(y_hat).clamp_(0, 1)
+            x_hat = self.g_s[0](y_hat).clamp_(0, 1) if self.multiple_decoder else self.g_s(y_hat).clamp_(0, 1)
             y_likelihoods = torch.cat(y_likelihood, dim=1)
             return {
+                "x_hat":x_hat,
                 "likelihoods": {"y": y_likelihoods,"z": z_likelihoods},
             "y_hat":y_hat,"y_base":y_hat,"y_complete":y_hat,
             "mu_base":mu_base,"mu_prog":mu_prog,"std_base":std_base,"std_prog":std_prog
@@ -361,8 +366,6 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
             ms_base = torch.cat([mu_base[current_index],std_base[current_index]],dim = 1) 
             ms_progressive =  torch.cat([mu,scale],dim = 1) if self.mu_std else scale
 
-            y_b_hat = y_checkpoint_hat[current_index]
-            y_b_hat.requires_grad = True
 
             quality_bar, quality_post, right_index  = self.find_check_quality(quality)
 
@@ -372,9 +375,16 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
             bar_mask =   self.masking(scale,pr = quality_bar,mask_pol = mask_pol)
             bar_mask = self.masking.apply_noise(bar_mask, training)
 
-            
             if self.enable_rem[right_index]:
-                
+                y_b_hat = y_checkpoint_hat[current_index]
+                if training:
+                    block_mask.requires_grad = True 
+                    bar_mask.requires_grad = True
+                    y_b_hat.requires_grad = True
+                    ms_base.requires_grad = True 
+                    ms_progressive.requires_grad = True 
+                    mu.requires_grad = True  
+                    scale.requires_grd = True
                 mu, scale = self.apply_latent_enhancement(current_index,
                                                         right_index,
                                                         block_mask,

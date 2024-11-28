@@ -177,6 +177,8 @@ def main(argv):
             list_quality.extend([10])
         lmbda_list = None
         rems = args.check_levels
+        
+        print("la lista delle quality is: ",list_quality)
     else:
         raise NotImplementedError()
 
@@ -188,7 +190,8 @@ def main(argv):
         bpp_init, psnr_init,_ = compress_with_ac(net, #net 
                                         filelist, 
                                         device,
-                                        pr_list =pr_list,  
+                                        pr_list =pr_list,
+                                        rems = rems,  
                                         mask_pol = mask_pol)
         net.enable_rem = [True for i in range(len(net.check_levels))]
         print("----> ",bpp_init," ",psnr_init) 
@@ -206,6 +209,7 @@ def main(argv):
         net.unfreeze_encoder()  
     elif args.training_type == "rems":
         net.unfreeze_rems()
+        net.enable_rem = [True for i in range(len(net.check_levels))]
 
     print("************************************************************")
     print("********************** START TRAINING **********************")
@@ -215,7 +219,8 @@ def main(argv):
     print("********************** START TRAINING **********************")
     print("************************************************************")     
 
-
+    print("REMS ",rems) 
+    print("list quality: ",list_quality)
     for epoch in range(last_epoch, args.epochs):
         print("******************************************************")
         print("epoch: ",epoch)
@@ -267,7 +272,6 @@ def main(argv):
                        model = net, 
                        criterion = criterion,
                        pr_list = list_pr,
-                       wandb_log = args.wandb_log,
                        rems = rems
                        )
         print("finito il test della epoca: ",bpp_t," ",psnr_t)
@@ -291,7 +295,7 @@ def main(argv):
             bpp, psnr,_ = compress_with_ac(net,  
                                             filelist, 
                                             device,
-                                          
+                                          rems = rems,
                                            pr_list =list_pr,  
                                             mask_pol = mask_pol
                                            )
@@ -339,7 +343,8 @@ def main(argv):
 
 
             #if is_best is True or epoch%10==0 or epoch > 98: #args.save:
-            save_checkpoint(
+            if args.wandb_log:
+                save_checkpoint(
                     {
                         "epoch": epoch,
                         "state_dict": net.state_dict(),
@@ -354,12 +359,12 @@ def main(argv):
                     very_best
                     )
 
-            log_dict = {
-            "train":epoch,
-            "train/leaning_rate": optimizer.param_groups[0]['lr']
-            #"train/beta": annealing_strategy_gaussian.bet
-            }
-            wandb.log(log_dict)
+                log_dict = {
+                "train":epoch,
+                "train/leaning_rate": optimizer.param_groups[0]['lr']
+                #"train/beta": annealing_strategy_gaussian.bet
+                }
+                wandb.log(log_dict)
 
 
     print("training completed")

@@ -62,16 +62,15 @@ def train_one_epoch(model,
         if sampling_training:
             quality_index =  random.randint(0, len(list_quality) - 1)
             quality = list_quality[quality_index]
-            out_net = model.forward_single_quality(d, quality = quality, training = True)
-
-
             if rems is None:
                 out_net = model.forward_single_quality(d, quality = quality, training = True)
             else:
+
+                
                 quality_ref = extract_quality_ref(quality,rems)
                 with torch.no_grad():
                     checkpoint_rep = model.ExtractChekpointRepr(d,quality =  quality_ref,rc = False )
-                    out_net = model.forward_single_quality(d,
+                out_net = model.forward_single_quality(d,
                                                         quality = quality, 
                                                         training = True,
                                                         checkpoint_ref = checkpoint_rep)
@@ -262,7 +261,6 @@ def compress_with_ac(model,
                     save_images = False):
 
     l = len(pr_list)
-    print("ho finito l'update")
     bpp_loss = [AverageMeter() for _ in range(l)]
     psnr =[AverageMeter() for _ in range(l)]
     mssim = [AverageMeter() for _ in range(l)]
@@ -285,7 +283,7 @@ def compress_with_ac(model,
                 if rems is None:
                     checkpoint_rep = None
                 else:
-                    quality_ref = extract_quality_ref(quality,rems)
+                    quality_ref = extract_quality_ref(p,rems)
                     checkpoint_rep = model.ExtractChekpointRepr(x_padded,
                                                                 quality =  quality_ref,
                                                                 rc = rc )
@@ -301,7 +299,7 @@ def compress_with_ac(model,
                                             data["shape"], 
                                             quality = p,
                                             mask_pol = mask_pol,
-                                            checkpoint_rep = None)
+                                            checkpoint_rep =checkpoint_rep)
                 end = time.time()
 
                 #print("Runtime of the epoch:  ", epoch)

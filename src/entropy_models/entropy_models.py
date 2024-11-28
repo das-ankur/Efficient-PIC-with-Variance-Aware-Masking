@@ -583,14 +583,12 @@ class GaussianConditional(EntropyModel):
         # Check if we need to update the gaussian conditional parameters, the
         # offsets are only computed and stored when the conditonal model is
         # updated.
-        print("ma qua ci entro prova miseria")
         device = self.scale_table.device
         self.scale_table = self._prepare_scale_table(scale_table).to(device)
         self.update(self.scale_table)
         return True
 
     def update(self,scale_table):
-        print("Gauss due volte")
         self.scale_table = self._prepare_scale_table(scale_table)
         multiplier = -self._standardized_quantile(self.tail_mass / 2)
         pmf_center = torch.ceil(self.scale_table * multiplier).int()
@@ -617,6 +615,7 @@ class GaussianConditional(EntropyModel):
         self._quantized_cdf = quantized_cdf
         self._offset = -pmf_center
         self._cdf_length = pmf_length + 2
+        print("Update is Over")
 
     def _likelihood(self, inputs: Tensor, scales: Tensor, means: Optional[Tensor] = None) -> Tensor:
         half = float(0.5)

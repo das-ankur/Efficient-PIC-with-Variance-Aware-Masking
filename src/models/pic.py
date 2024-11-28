@@ -228,7 +228,7 @@ class VarianceMaskingPIC(CompressionModel):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
     
     def update(self, scale_table=None, force=True):
-        print("ouuuuuuuuuuuuuuuuuuuuuuuuu")
+
         if scale_table is None:
             scale_table = get_scale_table()
         updated = self.gaussian_conditional.update_scale_table(scale_table)
