@@ -24,7 +24,7 @@ reconstruction quality. The masking system does not addfurther parameters nor co
 - conda env create -f environment.yml
 - conda activate pic 
 
-## Train - Step 1
+## Train - Step 1: training from scratch
 
 ```
 cd src 
@@ -42,7 +42,7 @@ python train.py  \
 ```
 
 
-## Train -Step 2 
+## Train -Step 2: fine-tune the decoder
 ```
 cd src 
 
@@ -59,7 +59,7 @@ python train.py \
 
 ```
 
-## Train -Step 3 
+## Train - Step 3: train the rems 
 ```
 cd src 
 
