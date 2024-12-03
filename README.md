@@ -58,3 +58,23 @@ python train.py \
 --model pic
 
 ```
+
+## Train -Step 3 
+```
+cd src 
+
+python train.py \
+--training_type rems
+--checkpoint #path-for-the-checkpoint \
+--epochs 80 \
+--patience 12 \
+--sampling_training  \
+--test_before \
+--check_levels 0.05 0.75 2
+--mu_std \
+--model rem
+```
+
+## Validate
+
+TODO
