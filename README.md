@@ -70,8 +70,8 @@ python train.py \
 --patience 12 \
 --sampling_training  \
 --test_before \
---check_levels 0.05 0.75 2 \
---check_levels_np 100 100 100 #number of sampling points for each subrange
+--check_levels 0.75 #quality level where to put rems checkpoint\
+--check_levels_np 100  #number of sampling points for each subrange
 --mu_std \
 --dimension middle \
 --model rem
