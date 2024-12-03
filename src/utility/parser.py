@@ -12,7 +12,7 @@ def parse_args(argv):
 
     parser.add_argument("--clip_max_norm",default=1.0,type=float,help="gradient clipping max norm (default: %(default)s",)
     parser.add_argument("--code", type=str, default = "firstTrain", help="Batch size (default: %(default)s)")
-    parser.add_argument("--checkpoint", type=str, default = "/scratch/WACV/models/DecodeRefineLRPBIS/_very_best.pth.tar") #"/scratch/ResDSIC/demo/l2_train/2l_memdmh_mem5/_very_best.pth.tar"
+    parser.add_argument("--checkpoint", type=str, default = "/scratch/WACV/models/refinemem5second/_very_best.pth.tar") #"/scratch/ResDSIC/demo/l2_train/2l_memdmh_mem5/_very_best.pth.tar"
     parser.add_argument("--checkpoint_base", type=str, default = "none") #dddd
     parser.add_argument("--cuda", action="store_true", help="Use cuda")
     parser.add_argument("--check_levels", nargs='+', type=float, default = [0.75])
@@ -35,7 +35,7 @@ def parse_args(argv):
     parser.add_argument("--multiple_decoder", action="store_true", help="Use cuda")
     parser.add_argument("--multiple_encoder", action="store_true", help="Use cuda")
     parser.add_argument("--multiple_hyperprior", action="store_true", help="Use cuda")
-    parser.add_argument("-m","--model",default="rem",choices=models.keys(),help="Model architecture (default: %(default)s)",)    
+    parser.add_argument("-m","--model",default="pic",choices=models.keys(),help="Model architecture (default: %(default)s)",)    
     parser.add_argument("--M", type=int, default=640, help="M")
     parser.add_argument("--mu_std", action="store_true", help="use entire mu as input")
 

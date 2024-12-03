@@ -153,7 +153,7 @@ def main(argv):
         list_pr_2 = list(np.arange(1.6,10 ,(10 - 1.6)/50)) + [10]
         list_quality = list_pr_1 + list_pr_2
         lmbda_list = None
-        rems = args.check_levels
+        rems = None
     elif args.training_type == "refine_gs_ga":
         list_pr_1 = list(np.arange(0.015,1.5 ,(1.5 - 0.025)/200)) + [1.5]
         list_pr_2 = list(np.arange(1.6,10 ,(10 - 1.6)/50)) + [10]
@@ -195,7 +195,8 @@ def main(argv):
                                         pr_list =pr_list,
                                         rems = rems,  
                                         mask_pol = mask_pol)
-        net.enable_rem = [True for i in range(len(net.check_levels))]
+        if args.model == "rem":
+            net.enable_rem = [True for i in range(len(net.check_levels))]
         print("----> ",bpp_init," ",psnr_init) 
     
 

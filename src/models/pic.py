@@ -668,7 +668,7 @@ class VarianceMaskingPIC(CompressionModel):
 
 
 
-    def compress(self, x, quality = 0.0, mask_pol = None):
+    def compress(self, x, quality = 0.0, mask_pol = None, checkpoint_rep = None):
 
 
         mask_pol = self.mask_policy if mask_pol is None else mask_pol
@@ -837,7 +837,7 @@ class VarianceMaskingPIC(CompressionModel):
 
 
 
-    def decompress(self, strings, shape, quality, mask_pol = None):
+    def decompress(self, strings, shape, quality, mask_pol = None,  checkpoint_rep = None):
 
 
         mask_pol = self.mask_policy if mask_pol is None else mask_pol

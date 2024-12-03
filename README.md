@@ -18,6 +18,29 @@ it into complementary components, which can be transmitted separately to the dec
 reconstruction quality. The masking system does not addfurther parameters nor complexity. At the receiver, any elements of the top latent representation excluded from the transmitted components can be independently replaced with the mean predicted by the hyperprior architecture, ensuring reliable reconstructions at any intermediate quality level. We also introduced Rate Enhancement Modules (REMs), which refine the estimation of entropy parameters using already decoded components. We obtain results competitive with state-of-the-art competitors, while significantly reducing computational complexity, decoding time, and number of parameters.
 
 
-## TODO
+## Usage
 
-The repository will be ready by February 2025 (WACV conference)
+### Environment
+- conda env create -f environment.yml
+- conda activate pic 
+
+## Train - Step 1
+
+```
+cd src 
+
+python train.py  --multiple_hyperprior \
+--multiple_decoder \
+--all_scalable \
+--delta_encode \
+--training_type first_train \
+--support_progressive_slices 5 \
+--total_mu_rep
+--save_path  # folder where to save checkpoints
+--code  # name of the folder where the checkpoints will be stored in /save_path/
+```
+
+
+## Train -Step 2 
+
+todo
