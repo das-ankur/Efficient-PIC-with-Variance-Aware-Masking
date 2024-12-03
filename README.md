@@ -29,7 +29,8 @@ reconstruction quality. The masking system does not addfurther parameters nor co
 ```
 cd src 
 
-python train.py  --multiple_hyperprior \
+python train.py  \
+--multiple_hyperprior \
 --multiple_decoder \
 --all_scalable \
 --delta_encode \
@@ -42,5 +43,18 @@ python train.py  --multiple_hyperprior \
 
 
 ## Train -Step 2 
+'''
+cd src 
 
-todo
+python train.py \
+--training_type refine_gs \
+--checkpoint #path-for-the-checkpoint \
+--total_mu_rep \
+--lrp \
+--epochs 80 \
+--patience 12 \
+--sampling_training  \
+--test_before \
+--model pic
+
+'''
