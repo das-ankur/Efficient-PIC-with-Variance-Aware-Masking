@@ -43,7 +43,7 @@ python train.py  \
 
 
 ## Train -Step 2 
-'''
+```
 cd src 
 
 python train.py \
@@ -57,4 +57,4 @@ python train.py \
 --test_before \
 --model pic
 
-'''
+```
