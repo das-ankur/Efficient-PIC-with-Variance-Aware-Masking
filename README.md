@@ -64,14 +64,14 @@ python train.py \
 cd src 
 
 python train.py \
---training_type rems
+--training_type rems \
 --checkpoint #path-for-the-checkpoint \
 --epochs 80 \
 --patience 12 \
 --sampling_training  \
 --test_before \
---check_levels 0.75 #quality level where to put rems checkpoint\
---check_levels_np 100  #number of sampling points for each subrange
+--check_levels 0.75 #quality level where to put rems checkpoint \
+--check_levels_np 100  #number of sampling points for each subrange \
 --mu_std \
 --dimension middle \
 --model rem
