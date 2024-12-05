@@ -6,7 +6,7 @@ from models import get_model
 from utility import sec_to_hours, compute_psnr
 import torch.nn.functional as F 
 import sys
-
+from training import compress_with_ac
 
 def main(argv):
 
@@ -33,46 +33,65 @@ def main(argv):
 
     path_save = args.path_save
     path_image = args.path_image
-    name_image = path_image.split("/")[-1].split(".")[0]
-    x, x_padded, unpad = read_and_pads_image(path_image,device)
 
-    ql = [0] + q_levs
-    for i,c in enumerate(ql):
-        ql[i] = c*10
+    if args.fast_encdec:
 
-    print("start encoding following this q_list: ",ql)
-    start_enc = time.time()
-    bitstreams = encode(net, x_padded, path_save, name_image , q_list = q_levs,rems = args.rems)
-    end_enc = time.time()
-    print("time for encoding")
-    sec_to_hours(end_enc - start_enc)
+        print("perform different encoding and decoding for each quality. Faster solution with same results")
+        pr_list = [0] + q_levs 
+        mask_pol = "point-based-std"
+        rems = None if args.rems else net.check_levels
+        filelist = [path_image]
+        bpp_image, psnr_image,_ = compress_with_ac(net, #net 
+                                    filelist, 
+                                    device,
+                                    pr_list =pr_list,
+                                    rems = rems,  
+                                    mask_pol = mask_pol)
+        print("results for image: ", path_image.split("/")[-1].split(".")[0])
+        for i in range(len(bpp_image)):
+            print("quality ",pr_list[0]*10,": bpp = ",bpp_image[i]," psnr = ",psnr_image[i])
+        print("done")  
+    else:   
+        name_image = path_image.split("/")[-1].split(".")[0]
+        x, x_padded, unpad = read_and_pads_image(path_image,device)
+
+        ql = [0] + q_levs
+        for i,c in enumerate(ql):
+            ql[i] = c*10
+
+        print("start encoding following this q_list: ",ql)
+        start_enc = time.time()
+        bitstreams = encode(net, x_padded, path_save, name_image , q_list = q_levs,rems = args.rems)
+        end_enc = time.time()
+        print("time for encoding")
+        sec_to_hours(end_enc - start_enc)
 
 
-    bitstreams["unpad"] = unpad
+        bitstreams["unpad"] = unpad
 
 
-    print("decode level base")
-    shape = bitstreams["y_shape"]
-    start_dec_base = time.time()
-    rec_hat_base  = decode(net, bitstreams, shape, q_ind = 0)
-    end_dec_base = time.time()
-    print("time for decoding first base level")
-    sec_to_hours(end_dec_base - start_dec_base)
+        print("decode level base")
+        shape = bitstreams["y_shape"]
+        start_dec_base = time.time()
+        rec_hat_base  = decode(net, bitstreams, shape, q_ind = 0)
+        end_dec_base = time.time()
+        print("time for decoding first base level")
+        sec_to_hours(end_dec_base - start_dec_base)
 
-    y_hat_base = rec_hat_base["y_hat"]
+        y_hat_base = rec_hat_base["y_hat"]
 
 
 
-    for qk in args.requested_levels:
-        print("decoding qk=====> ",qk)
-        start_dec_time = time.time()
-        recs  = decode(net, bitstreams, shape, q_ind = qk, y_hat_base=y_hat_base)
-        end_dec_time = time.time()
-        print("time for decoding: ",sec_to_hours(end_dec_time - start_dec_time))
-        recs["x_hat"] = F.pad(recs["x_hat"], unpad)
-        recs["x_hat"].clamp_(0.,1.)  
-        psnr_im = compute_psnr(x, recs["x_hat"])
-        print("the psnr is ",psnr_im)
+        for qk in args.requested_levels:
+            print("decoding qk=====> ",qk)
+            start_dec_time = time.time()
+            recs  = decode(net, bitstreams, shape, q_ind = qk, y_hat_base=y_hat_base)
+            end_dec_time = time.time()
+            print("time for decoding: ",sec_to_hours(end_dec_time - start_dec_time))
+            recs["x_hat"] = F.pad(recs["x_hat"], unpad)
+            recs["x_hat"].clamp_(0.,1.)  
+            psnr_im = compute_psnr(x, recs["x_hat"])
+            print("the psnr is ",psnr_im)
 
         
 

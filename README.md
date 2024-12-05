@@ -24,16 +24,16 @@ reconstruction quality. The masking system does not addfurther parameters nor co
 - conda env create -f environment.yml
 - conda activate pic 
 
-## Train - Step 1: training from scratch
+## Train - Step 1: Training from scratch
 
 ```
 cd src 
 
 python train.py  \
---multiple_hyperprior \
---multiple_decoder \
---all_scalable \
---delta_encode \
+--multiple_hyperprior  # for two separate hyperprior decoders\
+--multiple_decoder # for two separate decoders\
+--all_scalable # for full scalability \
+--delta_encode # for encoding delta representtion\
 --training_type first_train \
 --support_progressive_slices 5 \
 --total_mu_rep
@@ -42,7 +42,7 @@ python train.py  \
 ```
 
 
-## Train -Step 2: fine-tune the decoder
+## Train - Step 2: Fine-tune the decoder
 ```
 cd src 
 
@@ -78,5 +78,15 @@ python train.py \
 ```
 
 ## Validate
+```
+cd src 
 
-TODO
+python demo.py \
+--path_image #path-for-the-image-to-encode \ 
+--checkpoint #path-for-the-checkpoint \
+--rems # if-rems-activated \
+--fast_encdec #for fast encoding/decoding \
+--path_save #path-where-to-save-results \
+--model pic #type-of-model 
+--device cuda
+```

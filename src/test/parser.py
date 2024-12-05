@@ -9,11 +9,10 @@ def parse_args_demo(argv):
 
 
     parser.add_argument("--checkpoint", type=str, default = "/scratch/ResDSIC/demo/l2_train/2l_memdmh_mem5/_very_best.pth.tar") #"/scratch/ResDSIC/demo/l2_train/2l_memdmh_mem5/_very_best.pth.tar"
-    parser.add_argument("--path",type=str,default = "/scratch/ResDSIC/models/")
-    parser.add_argument("--data_path",type=str,default = "/scratch/dataset/kodak/kodim01.png")
     parser.add_argument("--model",type=str,default = "pic")
     parser.add_argument("--device",type=str,choices=["cpu","cuda"],default = "cuda")
     parser.add_argument("--rems", action="store_true", help="Use cuda") #/scratch/ScalableResults
+    parser.add_argument("--fast_encdec", action="store_true", help="Use cuda")
     parser.add_argument("--path_save",type=str,default = "/scratch/ScalableResults/bits")
     parser.add_argument("--path_image",type=str,default = "/scratch/dataset/kodak/kodim12.png")
 
