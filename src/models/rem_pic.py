@@ -396,7 +396,9 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
                                                         mu, 
                                                         scale,
                                                         )
-            
+            # delete in case 
+            block_mask =  self.masking(scale,pr = quality,mask_pol = mask_pol) # this is the q* in the original paper 
+            block_mask = self.masking.apply_noise(block_mask, training)
 
             y_slice_m = (y_slice  - mu)*block_mask
             _, y_slice_likelihood = self.gaussian_conditional(y_slice_m, 
@@ -605,7 +607,9 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
                                                         mu, 
                                                         scale,
                                                         )
-                
+            #delete in case
+            block_mask =  self.masking(scale,pr = quality,mask_pol = mask_pol) # this is the q* in the original paper 
+            block_mask = self.masking.apply_noise(block_mask, False)
             index = self.gaussian_conditional.build_indexes(scale*block_mask).int()
             if real_compress:
                 y_q_string  = self.gaussian_conditional.compress((y_slice - mu)*block_mask, index)
@@ -788,8 +792,10 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
 
             
  
-
-
+            #delete in case
+            block_mask =  self.masking(scale,pr = quality,mask_pol = mask_pol) # this is the q* in the original paper 
+            block_mask = self.masking.apply_noise(block_mask, False)
+            
             index = self.gaussian_conditional.build_indexes(scale*block_mask)
             rv = self.gaussian_conditional.decompress(pr_strings, index).to(mu.device)
             rv = rv.reshape(mu.shape)
