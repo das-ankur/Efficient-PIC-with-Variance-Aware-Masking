@@ -8,7 +8,7 @@ def parse_args_demo(argv):
     parser = argparse.ArgumentParser(description="Example training script.") #dddddddd
 
 
-    parser.add_argument("--checkpoint", type=str, default = "/scratch/ResDSIC/demo/l2_train/2l_memdmh_mem5/_very_best.pth.tar") #"/scratch/ResDSIC/demo/l2_train/2l_memdmh_mem5/_very_best.pth.tar"
+    parser.add_argument("--checkpoint", type=str, default = "/scratch/WACV/models/NoRems/_last.pth.tar") #"/scratch/ResDSIC/demo/l2_train/2l_memdmh_mem5/_very_best.pth.tar"
     parser.add_argument("--model",type=str,default = "pic")
     parser.add_argument("--device",type=str,choices=["cpu","cuda"],default = "cuda")
     parser.add_argument("--rems", action="store_true", help="Use cuda") #/scratch/ScalableResults

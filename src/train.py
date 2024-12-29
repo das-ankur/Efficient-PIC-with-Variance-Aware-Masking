@@ -193,7 +193,7 @@ def main(argv):
                                         filelist, 
                                         device,
                                         pr_list =pr_list,
-                                        rems = rems,  
+                                        rems = None,  
                                         mask_pol = mask_pol)
         if args.model == "rem":
             net.enable_rem = [True for i in range(len(net.check_levels))]

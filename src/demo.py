@@ -2,15 +2,20 @@ import torch
 import wandb
 from test import parse_args_demo, read_and_pads_image, encode,  decode
 import time 
+import os
+from torch.utils.data import DataLoader
+from torchvision import transforms
+from dataset import TestKodakDataset
 from models import get_model
 from utility import sec_to_hours, compute_psnr
 import torch.nn.functional as F 
 import sys
-from training import compress_with_ac
+from training import ScalableRateDistortionLoss, RateDistortionLoss, DistortionLoss, RateLoss
+from training import compress_with_ac,test_epoch
 
 def main(argv):
 
-    q_levs = [0.02,0.05,0.5,0.75,1,1.5,2,2.5,3,4,5,5.5,6,6.6,10] 
+    q_levs = [0,0.05,0.1,0.25,0.5,0.6,0.75,1,1.25,2,3,5,10]#0.02,0.05,0.5,0.75,1,1.5,2,2.5,3,4,5,5.5,6,6.6,10] 
     args = parse_args_demo(argv)
     print(args)
     if args.wandb:
@@ -34,12 +39,14 @@ def main(argv):
     path_save = args.path_save
     path_image = args.path_image
 
+
+
     if args.fast_encdec:
 
         print("perform different encoding and decoding for each quality. Faster solution with same results")
         pr_list = [0] + q_levs 
         mask_pol = "point-based-std"
-        rems = None if args.rems else net.check_levels
+        rems = None if args.rems is False else net.check_levels
         filelist = [path_image]
         bpp_image, psnr_image,_ = compress_with_ac(net, #net 
                                     filelist, 
@@ -49,8 +56,9 @@ def main(argv):
                                     mask_pol = mask_pol)
         print("results for image: ", path_image.split("/")[-1].split(".")[0])
         for i in range(len(bpp_image)):
-            print("quality ",pr_list[0]*10,": bpp = ",bpp_image[i]," psnr = ",psnr_image[i])
+            print("quality ",pr_list[i]*10,": bpp = ",bpp_image[i]," psnr = ",psnr_image[i])
         print("done")  
+
     else:   
         name_image = path_image.split("/")[-1].split(".")[0]
         x, x_padded, unpad = read_and_pads_image(path_image,device)

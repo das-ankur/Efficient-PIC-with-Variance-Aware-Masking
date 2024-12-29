@@ -11,8 +11,8 @@ def parse_args(argv):
     parser.add_argument( "--batch_size", type=int, default=16, help="batch_size")
 
     parser.add_argument("--clip_max_norm",default=1.0,type=float,help="gradient clipping max norm (default: %(default)s",)
-    parser.add_argument("--code", type=str, default = "firstTrain", help="Batch size (default: %(default)s)")
-    parser.add_argument("--checkpoint", type=str, default = "/scratch/WACV/models/memdmhmemory5NoDelta/_very_best.pth.tar") #"/scratch/ResDSIC/demo/l2_train/2l_memdmh_mem5/_very_best.pth.tar"
+    parser.add_argument("--code", type=str, default = "1rem", help="Batch size (default: %(default)s)")
+    parser.add_argument("--checkpoint", type=str, default = "/scratch/WACV/models/NoRems/_last.pth.tar") #"/scratch/ResDSIC/demo/l2_train/2l_memdmh_mem5/_very_best.pth.tar"
     parser.add_argument("--checkpoint_base", type=str, default = "none") #dddd
     parser.add_argument("--cuda", action="store_true", help="Use cuda")
     parser.add_argument("--check_levels", nargs='+', type=float, default = [0.75])
@@ -35,7 +35,7 @@ def parse_args(argv):
     parser.add_argument("--multiple_decoder", action="store_true", help="Use cuda")
     parser.add_argument("--multiple_encoder", action="store_true", help="Use cuda")
     parser.add_argument("--multiple_hyperprior", action="store_true", help="Use cuda")
-    parser.add_argument("-m","--model",default="pic",choices=models.keys(),help="Model architecture (default: %(default)s)",)    
+    parser.add_argument("-m","--model",default="rem",choices=models.keys(),help="Model architecture (default: %(default)s)",)    
     parser.add_argument("--M", type=int, default=640, help="M")
     parser.add_argument("--mu_std", action="store_true", help="use entire mu as input")
 
@@ -48,8 +48,8 @@ def parse_args(argv):
 
 
     parser.add_argument("--patch-size",type=int,nargs=2,default=(256, 256),help="Size of the patches to be cropped (default: %(default)s)",)
-    parser.add_argument("--patience", type=int, default=12, help="patience")
-    parser.add_argument("--project", type=str, default = "PIC", help="project name for wandb")
+    parser.add_argument("--patience", type=int, default=15, help="patience")
+    parser.add_argument("--project", type=str, default = "PIC-REM", help="project name for wandb")
     
 
 
@@ -64,7 +64,7 @@ def parse_args(argv):
     parser.add_argument("--test_before", action="store_true", help="test before start training")
     parser.add_argument("--training_dataset",  type=str, default = "/scratch/dataset/openimages", help="project name for wandb")
     parser.add_argument("--test_dataset",  type=str, default = "/scratch/dataset/kodak", help="test path")
-    parser.add_argument("--training_type",  type=str, default = "refine_gs", help="type of test")
+    parser.add_argument("--training_type",  type=str, default = "rems", help="type of test")
     #training_type
 
     parser.add_argument("--valid_batch_size",type=int,default=16,help="Test batch size (default: %(default)s)",)
