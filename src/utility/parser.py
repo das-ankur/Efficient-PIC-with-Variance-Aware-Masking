@@ -12,7 +12,7 @@ def parse_args(argv):
 
     parser.add_argument("--clip_max_norm",default=1.0,type=float,help="gradient clipping max norm (default: %(default)s",)
     parser.add_argument("--code", type=str, default = "firstTrain", help="Batch size (default: %(default)s)")
-    parser.add_argument("--checkpoint", type=str, default = "/scratch/WACV/models/refinemem5second/_very_best.pth.tar") #"/scratch/ResDSIC/demo/l2_train/2l_memdmh_mem5/_very_best.pth.tar"
+    parser.add_argument("--checkpoint", type=str, default = "/scratch/WACV/models/memdmhmemory5NoDelta/_very_best.pth.tar") #"/scratch/ResDSIC/demo/l2_train/2l_memdmh_mem5/_very_best.pth.tar"
     parser.add_argument("--checkpoint_base", type=str, default = "none") #dddd
     parser.add_argument("--cuda", action="store_true", help="Use cuda")
     parser.add_argument("--check_levels", nargs='+', type=float, default = [0.75])
@@ -64,7 +64,7 @@ def parse_args(argv):
     parser.add_argument("--test_before", action="store_true", help="test before start training")
     parser.add_argument("--training_dataset",  type=str, default = "/scratch/dataset/openimages", help="project name for wandb")
     parser.add_argument("--test_dataset",  type=str, default = "/scratch/dataset/kodak", help="test path")
-    parser.add_argument("--training_type",  type=str, default = "rems", help="type of test")
+    parser.add_argument("--training_type",  type=str, default = "refine_gs", help="type of test")
     #training_type
 
     parser.add_argument("--valid_batch_size",type=int,default=16,help="Test batch size (default: %(default)s)",)

@@ -78,6 +78,10 @@ python train.py \
 ```
 
 ## Validate
+
+Download our pretrained model in the following directory from [here]
+(https://drive.google.com/drive/u/0/folders/17arhBmcVsPdsyiH31u4rnKbiMOaMfDh-).
+
 ```
 cd src 
 
