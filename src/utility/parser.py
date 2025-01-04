@@ -1,7 +1,7 @@
 
 
 import argparse
-from models import models
+from models import models#ddd
 def parse_args(argv):
     parser = argparse.ArgumentParser(description="Example training script.") #dddd
 
@@ -16,12 +16,12 @@ def parse_args(argv):
     parser.add_argument("--checkpoint_base", type=str, default = "none") #dddd
     parser.add_argument("--cuda", action="store_true", help="Use cuda")
     parser.add_argument("--check_levels", nargs='+', type=float, default = [0.75])
-    parser.add_argument("--check_levels_np", nargs='+', type=int, default = [200])
+    parser.add_argument("--check_levels_np", nargs='+', type=int, default = [100])
 
     parser.add_argument("--division_dimension", nargs='+', type=int, default = [320, 640])
     parser.add_argument( "--dim_chunk", type=int, default=32, help="dim chunk")
     parser.add_argument("--delta_encode", action="store_true", help="delta encoder")
-    parser.add_argument("--dimension", type=str, default = "middle", help="dimension of post latent")
+    parser.add_argument("--dimension", type=str, default = "big", help="dimension of post latent")
 
     parser.add_argument("-e","--epochs",default=150,type=int,help="Number of epochs (default: %(default)s)",)
     parser.add_argument("--entity", type=str, default = "alberto-presta", help="entity name for wandb")
@@ -41,8 +41,8 @@ def parse_args(argv):
 
 
     parser.add_argument("-n","--num-workers",type=int,default=8,help="Dataloaders threads (default: %(default)s)",) #u_net_post
-    parser.add_argument("--num_images", type=int, default=300000, help="num images") #ddddddd
-    parser.add_argument("--num_images_val", type=int, default=816, help="Batch size (default: %(default)s)")
+    parser.add_argument("--num_images", type=int, default=100000, help="num images") #ddddddd
+    parser.add_argument("--num_images_val", type=int, default=416, help="Batch size (default: %(default)s)")
     parser.add_argument("--N", type=int, default=192, help="N")#ddddd#ddd
     parser.add_argument("--num_points", type=int, default=100, help="num points per segments")
 

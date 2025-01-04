@@ -176,12 +176,15 @@ def compute_psnr(a, b):
 def compute_msssim(a, b):
     return ms_ssim(a, b, data_range=1.).item()
 
-def sec_to_hours(seconds):
-    a=str(seconds//3600)
-    b=str((seconds%3600)//60)
-    c=str((seconds%3600)%60)
+def sec_to_hours(seconds,rt = False):
+    a=str(round(seconds//3600,2))
+    b=str(round((seconds%3600)//60,2))
+    c=str(round((seconds%3600)%60,2))
     d=["{} hours {} mins {} seconds".format(a, b, c)]
     print(d[0])
+    if rt:
+        return d[0]
+    
  
 
 

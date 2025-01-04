@@ -13,8 +13,8 @@ def read_and_pads_image(d,device):
     return x, x_padded, unpad
 
 
-def extract_latents_from_bits(model,bitstreams,q_ind):
-    z_hat = model.entropy_bottleneck.decompress(bitstreams["z"], bitstreams["shape"])
+def decode_hyperprior(model,z_string,shape,q_ind):
+    z_hat = model.entropy_bottleneck.decompress(z_string, shape)
 
     y_shape = [z_hat.shape[2] * 4, z_hat.shape[3] * 4]
     latent_scales_base = model.h_scale_s(z_hat) if model.multiple_hyperprior is False else model.h_scale_s[0](z_hat)

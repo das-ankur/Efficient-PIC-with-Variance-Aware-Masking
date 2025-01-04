@@ -108,6 +108,7 @@ def main(argv):
         args_save = checkpoint["args"]
         net = get_model(checkpoint["args"],device)
         net.load_state_dict(checkpoint["state_dict"], strict = True) #state_dict
+        print("mustd----> ",net.mu_std)
     else:
         if args.checkpoint_base != "none":
             net = get_model(args,device)
@@ -185,7 +186,7 @@ def main(argv):
         raise NotImplementedError()
 
     if args.checkpoint != "none" and args.test_before:
-        pr_list = [0,0.05,0.1,0.25,0.5,0.6,0.75,1,1.25,2,3,5,10] 
+        pr_list = [0,0.05,0.1,0.25,0.5,0.6,0.75,1,1.25,2,2.5,3,3.5,5,10] 
         mask_pol = "point-based-std"
         if args.model == "rem":
             net.enable_rem = [False for i in range(len(net.check_levels))]
@@ -195,9 +196,18 @@ def main(argv):
                                         pr_list =pr_list,
                                         rems = None,  
                                         mask_pol = mask_pol)
+        bpp_init_ee, psnr_init_ee = test_epoch( 
+                       test_dataloader = test_dataloader,
+                       model = net, 
+                       criterion = criterion,
+                       pr_list = pr_list,
+                       rems = None
+                       )
         if args.model == "rem":
             net.enable_rem = [True for i in range(len(net.check_levels))]
         print("----> ",bpp_init," ",psnr_init) 
+        print("with entropy estimation")
+        print("----> ",bpp_init_ee," ",psnr_init_ee )
     
 
     #print("done everything")
@@ -211,6 +221,7 @@ def main(argv):
         net.unfreeze_decoder()
         net.unfreeze_encoder()  
     elif args.training_type == "rems":
+        net.freeze_all()
         net.unfreeze_rems()
         net.enable_rem = [True for i in range(len(net.check_levels))]
 
@@ -261,14 +272,14 @@ def main(argv):
                         valid_dataloader,
                         criterion, 
                         net,
-                        pr_list = [0,10],
+                        pr_list = [0.76,1,1.25,2,3,5,10],
                         rems = rems,
                         wandb_log = args.wandb_log,
                         lmbda_list=lmbda_list) 
         lr_scheduler.step(loss)
         print(f'Current patience level: {lr_scheduler.patience - lr_scheduler.num_bad_epochs}')
-
-        list_pr = [0,0.05,0.1,0.25,0.5,0.6,0.75,1,1.25,2,3,5,10] 
+        print("************************************* INIZIO IL TEST!!!")
+        list_pr = [0,0.05,0.1,0.25,0.5,0.6,0.75,1,1.25,2,2.5,3,3.5,5,10] 
         mask_pol = "point-based-std"
         bpp_t, psnr_t = test_epoch( 
                        test_dataloader = test_dataloader,
@@ -277,7 +288,11 @@ def main(argv):
                        pr_list = list_pr,
                        rems = rems
                        )
-        print("finito il test della epoca: ",bpp_t," ",psnr_t)
+        print("End of testing the epoch with entropy estimation")
+        for i in range(len(pr_list)):
+            print("*****")
+            print("quality ",pr_list[i]*10," bpp init ",bpp_init_ee[i]," psnr init ",psnr_init_ee[i])
+            print("quality ",pr_list[i]*10," bpp ee ",bpp_t[i]," psnr init ",psnr_t[i])
 
 
 
@@ -306,7 +321,11 @@ def main(argv):
 
             psnr_res = {}
             bpp_res = {}
-            print("la compression come è andata: ",bpp, "  ",psnr)
+            print("End of testing the epoch with actual encodign")
+            for i in range(len(pr_list)):
+                print("*****")
+                print("quality ",pr_list[i]*10," bpp init ",bpp_init[i]," psnr init ",psnr_init[i])
+                print("quality ",pr_list[i]*10," bpp AE ",bpp[i]," psnr AE ",psnr[i])
             bpp_res["our"] = bpp
             psnr_res["our"] = psnr
 
@@ -329,10 +348,12 @@ def main(argv):
             psnr_res["tri_planet_22"] = tri_planet_22_psnr
 
             if args.wandb_log:
-                plot_rate_distorsion(bpp_res, psnr_res,epoch_enc, eest="compression")
+                plot_rate_distorsion(bpp_res, psnr_res,epoch_enc, eest="compression",star_point=[6,9])
                 bpp_res["our"] = bpp_t
-                psnr_res["our"] = psnr_t          
-                plot_rate_distorsion(bpp_res, psnr_res,epoch_enc, eest="model")
+                psnr_res["our"] = psnr_t 
+                bpp_res["base"] =   bpp_init_ee
+                psnr_res["base"] =  psnr_init_ee        
+                plot_rate_distorsion(bpp_res, psnr_res,epoch_enc, eest="model",star_point=[6,9])
                 epoch_enc += 1
 
 

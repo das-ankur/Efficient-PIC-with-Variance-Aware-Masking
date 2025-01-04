@@ -27,7 +27,7 @@ class VarianceMaskingPIC(CompressionModel):
     def __init__(self, 
                 N=192, 
                 M=640, 
-                division_dimension = [320,416],
+                division_dimension = [320,640],
                 dim_chunk = 32,
                 multiple_decoder = True,
                 multiple_encoder = True,
@@ -610,7 +610,7 @@ class VarianceMaskingPIC(CompressionModel):
 
 
             mu_total.append(mut)
-            std_total.append(scale)
+            #std_total.append(scale)
             scale = scale[:, :, :y_shape[0], :y_shape[1]]
             #mu_prog[current_index] = mu_base[current_index] + mu
             #std_prog[current_index] = std_prog[current_index] + scale #ffff
@@ -750,7 +750,7 @@ class VarianceMaskingPIC(CompressionModel):
             y_hat_slices.append(y_hat_slice)
 
         if quality <= 0:
-            mean_base = torch.cat(mean_base,dim = 1)
+            mean_base = torch.cat(mean_base,dim = 1)#d
             scale_base = torch.cat(scales_baseline,dim = 1)
             y_hat_base = torch.cat(y_hat_slices,dim = 1)
             return {"strings": [y_strings, z_strings],
@@ -799,8 +799,6 @@ class VarianceMaskingPIC(CompressionModel):
 
             scale = self.cc_scale_transforms_prog[current_index](scale_support)#self.extract_scale(idx,slice_index,scale_support)
             std_total.append(scale)
-
-
             mu_total.append(mut)
                 
             

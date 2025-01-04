@@ -4,45 +4,26 @@ from utility import  read_image, compute_padding
 import torch.nn.functional as F 
 import os
 import pickle
+import itertools
 import time
 import torch
 from .utils import extract_retrieve_entropy_parameters 
-from utility import sec_to_hours
 
-q_list = [0.002,0.05,0.5,0.75,1,1.5,2,2.5,3,4,5,5.5,6,6.6,10] 
 
-def encode(model, x_padded, path_save, name_image,rems = False,q_list = q_list):
+q_list = [0.002,0.05,0.5,0.75,1,1.5,2,2.5,3,4,5,5.5,6,6.6] 
+
+def encode(model, x_padded, save_path= None,rems = False,q_list = q_list):
 
 
     print("encode level base")
-    start_base = time.time()
-    out_base = model.compress(x_padded, quality = 0)
-    end_base = time.time()
-    print("Done encoding base: ",end_base - start_base)
+
+    out_base = model.compress(x_padded, quality = 0)  
+    
 
 
     mu_base = out_base["mean_base"]
     std_base = out_base["scale_base"]
     y_hat_base = out_base["y_hat_base"]
-    #y = out_base["y"]
-
-    
-    strings_z = out_base["strings"][1]
-    strings_base = out_base["strings"][0]
-    
-    folder = os.path.join(path_save,name_image)
-    os.makedirs(folder,exist_ok = True)
-    name =  os.path.join(folder,"base.pkl")
-    with open(name, 'wb') as file:
-        pickle.dump(strings_base, file)
-
-    name =  os.path.join(folder,"z.pkl")
-    with open(name, 'wb') as file:
-        pickle.dump(strings_z, file)    
-        
-
-
-
 
 
     bitstreams = {}
@@ -50,12 +31,13 @@ def encode(model, x_padded, path_save, name_image,rems = False,q_list = q_list):
     bitstreams["shape"] = out_base["shape"]
     bitstreams["z"] = out_base["strings"][1]
     bitstreams["base"] = out_base["strings"][0]
-    #bitstreams["top"] = []
+    
+    bits_z =  sum(len(s) for s in bitstreams["z"]) * 8.0 
+    bits_base = sum(len(s[0]) for s in bitstreams["base"]) * 8.0
+
 
     start_t = time.time()
-
-
-    bitstreams_list, shape = extract_all_bitsreams(model,
+    bitstreams_list, bits_prog = extract_all_bitsreams(model,
                                         x_padded,
                                         y_hat_base,
                                         mu_base,
@@ -65,15 +47,28 @@ def encode(model, x_padded, path_save, name_image,rems = False,q_list = q_list):
                                         y_checkpoint = None)
 
     end_t = time.time()
-    bitstreams["top"] = bitstreams_list 
-    bitstreams["y_shape"] = shape 
+    bitstreams["progressive"] = bitstreams_list 
+    #bitstreams["y_shape"] = c 
     #bitstreams["unpad"] = unpad
-    print("Done encoding progressive parts: ",end_t-start_t) 
-    return bitstreams 
+    print("Done encoding PP: ",end_t-start_t) 
+    if save_path is not None:
+        os.makedirs(save_path,exist_ok = True)
+        name =  os.path.join(save_path,"bits.pkl")
+        with open(name, 'wb') as file:
+           pickle.dump(bitstreams, file)
+    
+    return bitstreams,[bits_z,bits_base,bits_prog]
 
 
 
-def extract_all_bitsreams(model, x, y_hat_base, mu_base,std_base, q_list, y_checkpoint = None, rems = False):
+def extract_all_bitsreams(model, 
+                          x, 
+                          y_hat_base, 
+                          mu_base,
+                          std_base, 
+                          q_list,
+                          y_checkpoint = None, 
+                          rems = False):
 
 
     if model.multiple_encoder:
@@ -102,11 +97,13 @@ def extract_all_bitsreams(model, x, y_hat_base, mu_base,std_base, q_list, y_chec
     r_slices = []
     indexes_slices = []
     scale_slices = []
-    #print("one cycle for")
-    #start_t = time.time()
+
+    mean = []
+    mean_support_slices = []
+
     for slice_index in range(model.ns0,model.ns1):
 
-        current_index = slice_index%model.ns0
+        current_index = slice_index%model.ns0 #ddddddd
         y_slice = y_slices[slice_index]
         if model.delta_encode:
             r_slice = y_slice - y_slices[current_index]
@@ -123,114 +120,56 @@ def extract_all_bitsreams(model, x, y_hat_base, mu_base,std_base, q_list, y_chec
 
         mu_total.append(mu_t)
         std_total.append(scale)
+        mean.append(mu)
+        mean_support_slices.append(mean_support)
 
 
-        r_slice_zero_mu = r_slice - mu
 
-        r_slice_quantize = model.gaussian_conditional.quantize(r_slice_zero_mu,"symbols") #[1,nc,h,w]
-        indexes_sl = model.gaussian_conditional.build_indexes(scale).int() #[1,ch,h,w]
-
-        r_slice_quantize = r_slice_quantize.ravel().unsqueeze(0) #[1,1*ch*h*w] 
-        indexes_sl = indexes_sl.ravel().unsqueeze(0) #[1,1*ch*h*w]
-        scale_slice = scale.ravel().unsqueeze(0) #[1,1*ch*h*w]
+        r_slice_quantize = model.gaussian_conditional.quantize(r_slice - mu,"symbols") #[1,32,h,w]
+        indexes_sl = model.gaussian_conditional.build_indexes(scale).int() #[1,32,h,w]
+        
+        
         r_slices.append(r_slice_quantize)
         indexes_slices.append(indexes_sl)
-        scale_slices.append(scale_slice)
-    #end_t = time.time()
-    #print("end for cycle: ",end_t - start_t)
+        scale_slices.append(scale)
 
 
-    r_hat_slice = torch.cat(r_slices,dim = 0) #[10,ch*h*w]
-    index_hat_slice = torch.cat(indexes_slices,dim = 0) #[10,ch*h*w]
-    scale_hat_slice = torch.cat(scale_slices,dim = 0) # [10,ch*h*w]
+    mean = torch.cat(mean,dim = 1).squeeze(0)#.ravel() #[10,32,h,w]
+    #prova = torch.cat(prova,dim = 1).squeeze(0)
+    #print("dimensione della prova",prova.shape)
 
-
-    ordered_scale,std_ordering_index = torch.sort(scale_hat_slice, dim=1, descending=True)
-
-
-    r_hat_slice_ordered = torch.gather(r_hat_slice,dim = 1, index= std_ordering_index) #[10,ch*h*w]
-    ordered_index = torch.gather(index_hat_slice,dim = 1,index = std_ordering_index) #[10,ch*h*w]
-
-
-
-    q_init = 0
-    shapes =  r_hat_slice_ordered[0].shape[0]
-
+    r_hat_slice = torch.stack(r_slices).squeeze(1)#.ravel() #[10,32,h,w]
+    index_hat_slice = torch.stack(indexes_slices).squeeze(1)#.ravel() #[10,32,h,w]
 
     bitstream = []
+    bits = []
 
     for j, qs in enumerate(q_list):
 
-        
-        q_end = qs*10
+
+
         q_init = 0 if j == 0 else q_list[j-1]
-        q_init = q_init*10
-        init_length = int((q_init*shapes)/100) + 1 if j > 0 else 0 
-        end_length =  int((q_end*shapes)/100) 
-        r_hat_tbc = r_hat_slice_ordered[:,init_length:end_length + 1] #[10,init_l:end_l]
-        ordered_index_bc = ordered_index[:,init_length:end_length + 1] #ddd
-        symbols_list = torch.flatten(r_hat_tbc).unsqueeze(0) # [1,10*(end_length - init_length)]
-        indexes_l = torch.flatten(ordered_index_bc).unsqueeze(0) # [1,10*K]
+        q_end = qs
+
+
+        delta_mask_i = model.masking.ProgMask(scale_slices,q_init)#.ravel() #[10,320,h,w] of ones and zeros
+        delta_mask_e = model.masking.ProgMask(scale_slices,q_end)#.ravel() #[320,h,w] of ones and zeros
+
+        
+        
+        delta_mask = delta_mask_e - delta_mask_i#.bool()
+
+        indexes_l = index_hat_slice*delta_mask
+        symbols_list =  r_hat_slice*delta_mask
+        
         symbols_q = model.gaussian_conditional.compress(symbols_list,indexes_l,already_quantize = True)
-        prova =     model.gaussian_conditional.decompress(symbols_q,indexes_l)                                                    
+        bpp_scale = sum(len(s) for s in symbols_q) * 8.0 
+        #print("lunghezza in bpp di ",j,": ",int(bpp_scale*num_pixels)," ",bpp_scale)
+        bits.append(bpp_scale)
         bitstream.append(symbols_q)
-        """ approccio di riserva
-        q_init = 0 if j == 0 else q_list[j-1]
-        q_end = qs*10
-        delta_mask = model.masking(scale_hat_slice,q_init,q_end).ravel() #[10*ch*h*w] of ones and zeros
-        indexes_l = indexes_l.ravel()[delta_mask].unsqueeze(0) #[1,number of chosen elements]
-        symbols_list = r_hat_slice_ordered.ravel()[delta_mask].unsqueeze(0) #[1,number of chosen elements]
-        symbols_q = model.gaussian_conditional.compress(symbols_list,indexes_l,already_quantize = True)
-        bitstream.append(symbols_q)
-        # at decoding we have:
-        # obtained indexes_l with de3lta
-        #zeros_elements = torch.zeros_loike(total)
-        #indexes_l_decode = indexes_l.ravel()[delta_mask].unsqueeze(0) #[1,number of chosen elements]
-        #prova =     model.gaussian_conditional.decompress(bits_q,indexes_l)#[1,number of chosen elements]
-        # zeros_elements[delta_mask] = prova
-        """
-        
-        
-        
 
+    return bitstream,bits
 
-
-
-
-
-    
-    for j in range(len(bitstream)):
-        qs =q_list[j]
-        symbols = bitstream[j]
-
-        q_end = qs*10
-        q_init = 0 if j == 0 else q_list[j-1]
-        q_init = q_init*10
-        init_length = int((q_init*shapes)/100) + 1 if j > 0 else 0 
-        end_length =  int((q_end*shapes)/100) 
-
-        
-        ordered_index_bc = ordered_index[:,init_length:end_length + 1] #ddd
-        indexes_l = torch.flatten(ordered_index_bc).unsqueeze(0)
-
-
-
-        symbols_q = model.gaussian_conditional.decompress(symbols,
-                                                             indexes_l)
-
-
-        r_hat_tbc = symbols_q.float()#reshape(10,-1).unsqueeze(0).float()  #divido nelle sottosezioni
-        
-        #print("dec ",j," shape is ",r_hat_tbc.shape)
-
-
-
-    #print("check if it is the same (hope) ",r_dec[0].shape)
-    #print(torch.unique(r_dec[0],return_counts =True))
-    
-
-
-    return bitstream, shapes
 
 
 

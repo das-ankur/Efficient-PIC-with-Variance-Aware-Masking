@@ -5,7 +5,7 @@ import wandb
 import torch
 
 
-def plot_rate_distorsion(bpp_res, psnr_res,epoch, eest = "compression"):
+def plot_rate_distorsion(bpp_res, psnr_res,epoch, eest = "compression", star_point = None):
 
 
 
@@ -48,6 +48,10 @@ def plot_rate_distorsion(bpp_res, psnr_res,epoch, eest = "compression"):
         plt.plot(bpp,psnr,"-" ,color = colore, label =  leg ,markersize=8)
         
         plt.plot(bpp, psnr, marker="o", markersize=4, color =  colore)
+        if star_point is not None:
+            if "our" in leg:
+                for s in star_point:
+                    plt.plot(bpp[s], psnr[s], marker="x", markersize=10, color =  colore)
 
 
         for j in range(len(bpp)):

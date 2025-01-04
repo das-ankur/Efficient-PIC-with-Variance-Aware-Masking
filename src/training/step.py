@@ -13,7 +13,7 @@ from torch.nn.functional import mse_loss
 def extract_quality_ref(quality, check_levels):
 
     if quality <= check_levels[0]:
-        quality_ref = -1 
+        quality_ref = None 
 
     elif (len(check_levels) == 2 or len(check_levels) == 3)  and check_levels[0] < quality <= check_levels[1]:
             quality_ref = check_levels[0]
@@ -69,7 +69,10 @@ def train_one_epoch(model,
                 
                 quality_ref = extract_quality_ref(quality,rems)
                 with torch.no_grad():
-                    checkpoint_rep = model.ExtractChekpointRepr(d,quality =  quality_ref,rc = False )
+                    if quality_ref is None:
+                        checkpoint_rep = None
+                    else:
+                        checkpoint_rep = model.ExtractChekpointRepr(d,quality =  quality_ref,rc = False )
                 out_net = model.forward_single_quality(d,
                                                         quality = quality, 
                                                         training = True,
@@ -159,9 +162,10 @@ def valid_epoch(epoch,
                     out_net = model.forward_single_quality(d, quality = p, training = False)
                 else:
                     quality_ref = extract_quality_ref(p,rems)
-                    checkpoint_rep = model.ExtractChekpointRepr(d,
-                                                                quality =  quality_ref,
-                                                                rc = False )
+                    if quality_ref is None:
+                        checkpoint_rep = None
+                    else:
+                        checkpoint_rep = model.ExtractChekpointRepr(d,quality =  quality_ref,rc = False )
                     out_net = model.forward_single_quality(d,
                                                         quality = p, 
                                                         training = False,
@@ -221,9 +225,11 @@ def test_epoch(
                     out_net = model.forward_single_quality(d, quality = p, training = False)
                 else:
                     quality_ref = extract_quality_ref(p,rems)
-                    checkpoint_rep = model.ExtractChekpointRepr(d,
-                                                                quality =  quality_ref,
-                                                                rc = False )
+                    if quality_ref is None:
+                        checkpoint_rep = None
+                    else:
+                        checkpoint_rep = model.ExtractChekpointRepr(d,quality =  quality_ref,rc = False )
+
                     out_net = model.forward_single_quality(d,
                                                         quality = p, 
                                                         training = False,
@@ -284,10 +290,11 @@ def compress_with_ac(model,
                     checkpoint_rep = None
                 else:
                     quality_ref = extract_quality_ref(p,rems)
-                    checkpoint_rep = model.ExtractChekpointRepr(x_padded,
-                                                                quality =  quality_ref,
-                                                                rc = rc )
-                
+                    if quality_ref is None:
+                        checkpoint_rep = None
+                    else:
+                        checkpoint_rep = model.ExtractChekpointRepr(x_padded,quality =  quality_ref,rc = rc)
+
 
                 data =  model.compress(x_padded, 
                                     quality =p, 

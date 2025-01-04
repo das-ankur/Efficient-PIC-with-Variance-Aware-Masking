@@ -276,7 +276,7 @@ class EntropyModel(nn.Module):
 
         cdf = self._quantized_cdf
         outputs = cdf.new_empty(indexes.size())
-
+        #print("siamo in decompress: ",outputs.shape)
         for i, s in enumerate(strings):
             values = self.entropy_coder.decode_with_indexes(
                 s,
@@ -537,7 +537,7 @@ class GaussianConditional(EntropyModel):
         **kwargs: Any,
     ):
         super().__init__(*args, **kwargs)
-        print("MAIOENTROQUA!!!!!!!!!!!!!!!!!!!!!!!!!!")
+    
         if not isinstance(scale_table, (type(None), list, tuple)):
             raise ValueError(f'Invalid type for scale_table "{type(scale_table)}"')
 

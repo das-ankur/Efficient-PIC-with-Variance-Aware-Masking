@@ -21,7 +21,7 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
                 all_scalable = True,
                 mask_policy = "point-based-std",
                 check_levels = [0.01,0.25,1.75],
-                mu_std = False,
+                mu_std = True,
                 dimension = "big",
                 **kwargs):
         super().__init__(N = N, 
@@ -45,7 +45,7 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
 
 
         self.check_multiple = len(self.check_levels)
-        self.mu_std = mu_std
+        self.mu_std = mu_std#mu_std
 
 
         self.post_latent = nn.ModuleList(
@@ -57,8 +57,6 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
 
 
     def unfreeze_rems(self):
-        for n,p in self.named_parameters():
-            p.requires_grad = False
 
         for i in range(len(self.post_latent)):
             for n,p in self.post_latent[i].named_parameters():
@@ -161,7 +159,7 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
         elif (len(self.check_levels) == 2 or len(self.check_levels) == 3)  and self.check_levels[0] < quality <= self.check_levels[1]:
                 quality_ref = self.check_levels[0]
                 quality_post = self.check_levels[1]
-                right_index == 0 
+                right_index = 0 
         elif len(self.check_levels) == 2 and quality > self.check_levels[1]:
             quality_ref = self.check_levels[1]
             quality_post = 10
@@ -177,8 +175,62 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
             right_index = -1
         return quality_ref, quality_post, right_index
 
+    def apply_latent_enhancement(self,
+                                current_index,
+                                quality,
+                                quality_bar,
+                                y_b_hat, 
+                                mu_scale_base, 
+                                mu_scale_enh,
+                                mu, 
+                                scale,
+                                training = False,
+                                mask_pol = "point-based-std",
+                                attention_mask = None):
 
 
+        if attention_mask is None:
+            bar_mask = self.masking(scale,
+                                    pr = quality_bar,
+                                    mask_pol = mask_pol)
+            star_mask = self.masking(scale,
+                                    
+                                    pr = quality,
+                                    mask_pol = mask_pol) 
+
+            attention_mask = bar_mask 
+            #print("number of zeros in the attention mask: ",torch.unique((attention_mask)))
+            attention_mask = self.masking.apply_noise(attention_mask, training)   
+
+        if self.mu_std:
+            attention_mask = torch.cat([attention_mask,attention_mask],dim = 1)  
+        # in any case I do not improve anithing here!
+        if quality <= self.check_levels[0]: 
+            return mu, scale         
+
+        if self.check_multiple == 1:
+            enhanced_params =  self.post_latent[0][current_index](y_b_hat, mu_scale_base, mu_scale_enh, attention_mask)
+        elif self.check_multiple == 2:
+            index = 0 if self.check_levels[0] < quality <= self.check_levels[1] else 1 
+            enhanced_params =  self.post_latent[index][current_index](y_b_hat, mu_scale_base, mu_scale_enh, attention_mask)
+        else: 
+            index = -1 
+            if self.check_levels[0] < quality <= self.check_levels[1]: #ffff
+                index = 0 
+                #index = -1
+            elif  self.check_levels[1] < quality <= self.check_levels[2]:
+                index = 1
+            else:
+                index = 2 
+            enhanced_params =  self.post_latent[index][current_index](y_b_hat, mu_scale_base, mu_scale_enh, attention_mask)   
+        if self.mu_std:
+                mu,scale = enhanced_params.chunk(2,1)
+                return mu, scale
+        else:
+            scale = enhanced_params
+            return mu, scale
+
+    """
     def apply_latent_enhancement(self,
                                 current_index,
                                 right_index,
@@ -210,28 +262,14 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
 
         enhanced_params =  self.post_latent[right_index][current_index](y_b_hat, mu_scale_base, mu_scale_enh, attention_mask)
 
-        """
-        if self.check_multiple == 1:
-            enhanced_params =  self.post_latent[0][current_index](y_b_hat, mu_scale_base, mu_scale_enh, attention_mask)
-        elif self.check_multiple == 2:
-            index = 0 if self.check_levels[0] < quality <= self.check_levels[1] else 1 
-            enhanced_params =  self.post_latent[index][current_index](y_b_hat, mu_scale_base, mu_scale_enh, attention_mask)
-        else: 
-            index = -1 
-            if self.check_levels[0] < quality <= self.check_levels[1]: #ffff
-                index = 0 
-            elif  self.check_levels[1] < quality <= self.check_levels[2]:
-                index = 1
-            else:
-                index = 2 
-            enhanced_params =  self.post_latent[index][current_index](y_b_hat, mu_scale_base, mu_scale_enh, attention_mask)   
-        """
+
         if self.mu_std:
                 mu,scale = enhanced_params.chunk(2,1)
                 return mu, scale
         else:
             scale = enhanced_params
             return mu, scale
+        """
 
 
 
@@ -314,7 +352,7 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
         y_likelihood_quality = []
         y_likelihood_quality = y_likelihood + []#ffff
 
-        y_checkpoint_hat = checkpoint_ref.chunk(10,1) if checkpoint_ref is not None else y_hat_slices
+        y_checkpoint_hat = checkpoint_ref.chunk(10,1) if checkpoint_ref is not None else None
 
 
         mu_total = []
@@ -362,42 +400,38 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
             scale = scale[:, :, :y_shape[0], :y_shape[1]] #fff
 
 
-            # qua avviene la magia! 
-            ms_base = torch.cat([mu_base[current_index],std_base[current_index]],dim = 1) 
-            ms_progressive =  torch.cat([mu,scale],dim = 1) if self.mu_std else scale
 
 
-            quality_bar, quality_post, right_index  = self.find_check_quality(quality)
+            quality_bar, _, right_index  = self.find_check_quality(quality)
 
-            block_mask =  self.masking(scale,pr = quality,mask_pol = mask_pol) # this is the q* in the original paper 
-            block_mask = self.masking.apply_noise(block_mask, training)
+            #block_mask =  self.masking(scale,pr = quality,mask_pol = mask_pol) # this is the q* in the original paper 
+            #block_mask = self.masking.apply_noise(block_mask, training)
 
-            bar_mask =   self.masking(scale,pr = quality_bar,mask_pol = mask_pol)
-            bar_mask = self.masking.apply_noise(bar_mask, training)
+            #bar_mask =   self.masking(scale,pr = quality_bar,mask_pol = mask_pol)
+            #bar_mask = self.masking.apply_noise(bar_mask, training)
 
-            if self.enable_rem[right_index]:
+            if self.enable_rem[right_index] and y_checkpoint_hat is not None:
+
                 y_b_hat = y_checkpoint_hat[current_index]
-                if training:
-                    block_mask.requires_grad = True 
-                    bar_mask.requires_grad = True
-                    y_b_hat.requires_grad = True
-                    ms_base.requires_grad = True 
-                    ms_progressive.requires_grad = True 
-                    mu.requires_grad = True  
-                    scale.requires_grd = True
+                ms_base = torch.cat([mu_base[current_index],std_base[current_index]],dim = 1) 
+                ms_progressive =  torch.cat([mu,scale],dim = 1) if self.mu_std else scale
+                y_b_hat.requires_grad = True
                 mu, scale = self.apply_latent_enhancement(current_index,
-                                                        right_index,
-                                                        block_mask,
-                                                        bar_mask,
-                                                        quality,
-                                                        y_b_hat, 
-                                                        ms_base, 
-                                                        ms_progressive,
-                                                        mu, 
-                                                        scale,
-                                                        )
-            # delete in case 
-            block_mask =  self.masking(scale,pr = quality,mask_pol = mask_pol) # this is the q* in the original paper 
+                                                            quality,
+                                                            quality_bar,
+                                                            y_b_hat, 
+                                                            ms_base, 
+                                                            ms_progressive,
+                                                            mu, 
+                                                            scale,
+                                                            training =False)
+
+
+
+
+            block_mask = self.masking(scale,
+                                      pr = quality,
+                                      mask_pol = mask_pol) 
             block_mask = self.masking.apply_noise(block_mask, training)
 
             y_slice_m = (y_slice  - mu)*block_mask
@@ -538,7 +572,7 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
 
         y_hat_slices_quality = []
 
-        y_b_hats = checkpoint_rep.chunk(10,1) if checkpoint_rep is not None else y_hat_slices 
+        y_b_hats = checkpoint_rep.chunk(10,1) if checkpoint_rep is not None else None 
 
         mu_total, std_total = [],[]
         for slice_index in range(self.ns0,self.ns1): #ffff
@@ -576,40 +610,31 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
             std_total.append(scale)
             mu_total.append(mut)
 
-            y_b_hat = y_b_hats[current_index]
-
-            ms_base = torch.cat([mu_base[current_index],std_base[current_index]],dim = 1) 
-            ms_progressive =  torch.cat([mu,scale],dim = 1) if self.mu_std else scale
-            
-            
-            
-            quality_bar,quality_post, right_index = self.find_check_quality(quality)
+            quality_bar, _, right_index  = self.find_check_quality(quality)
 
 
-            block_mask = self.masking(scale,pr = quality,mask_pol = mask_pol)
-            block_mask = self.masking.apply_noise(block_mask, False)
-            masks.append(block_mask)
-
-            bar_mask = self.masking(scale,pr = quality_bar,mask_pol = mask_pol)
-            bar_mask = self.masking.apply_noise(bar_mask, False)
+            if self.enable_rem[right_index] and y_b_hats is not None:
 
 
-            if self.enable_rem[right_index]:
-
-                mu, scale = self.apply_latent_enhancement(current_index,
-                                                        right_index,
-                                                        block_mask,
-                                                        bar_mask,
-                                                        quality,
+                y_b_hat = y_b_hats[current_index]
+                ms_base = torch.cat([mu_base[current_index],std_base[current_index]],dim = 1) 
+                mu_progressive =  torch.cat([mu,scale],dim = 1) if self.mu_std else scale
+                
+                mu, scale = self.apply_latent_enhancement(current_index, 
+                                                        quality, 
+                                                        quality_bar,
                                                         y_b_hat, 
-                                                        ms_base, 
-                                                        ms_progressive,
-                                                        mu, 
+                                                        ms_base,
+                                                        mu_progressive,
+                                                        mu,
                                                         scale,
-                                                        )
-            #delete in case
-            block_mask =  self.masking(scale,pr = quality,mask_pol = mask_pol) # this is the q* in the original paper 
+                                                        training = False)
+
+            block_mask = self.masking(scale,
+                                        pr = quality, 
+                                        mask_pol = mask_pol) 
             block_mask = self.masking.apply_noise(block_mask, False)
+
             index = self.gaussian_conditional.build_indexes(scale*block_mask).int()
             if real_compress:
                 y_q_string  = self.gaussian_conditional.compress((y_slice - mu)*block_mask, index)
@@ -758,43 +783,61 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
 
             scale = scale[:, :, :y_shape[0], :y_shape[1]] #fff
 
-            y_b_hat =  y_b_hats[current_index]
 
-            #y_b_hat = y_b_hats[current_index]
-            ms_base = torch.cat([mu_base[current_index],std_base[current_index]],dim = 1) 
-            ms_progressive =  torch.cat([mu,scale],dim = 1) if self.mu_std else scale
-
-
-            
                    
             quality_bar,quality_post,right_index = self.find_check_quality(quality)
 
-            block_mask = self.masking(scale,pr = quality,mask_pol = mask_pol) 
-            bar_mask = self.masking(scale,pr = quality_bar,mask_pol = mask_pol)
+
             
+            bar_mask = self.masking(scale,pr = quality_bar,mask_pol = mask_pol)
             post_mask = self.masking(scale,pr = quality_post,mask_pol = mask_pol) 
 
 
 
-            if self.enable_rem[right_index]:
-                mu, scale = self.apply_latent_enhancement(current_index,
-                                                          right_index,
-                                                        post_mask,
-                                                        bar_mask,
-                                                        quality,
+            if self.enable_rem[right_index] and y_b_hats is not None:
+
+
+                y_b_hat =  y_b_hats[current_index]
+
+
+                #y_b_hat = y_b_hats[current_index]
+                ms_base = torch.cat([mu_base[current_index],std_base[current_index]],dim = 1) 
+                ms_progressive =  torch.cat([mu,scale],dim = 1) if self.mu_std else scale
+
+
+                mu, scale = self.apply_latent_enhancement(current_index, 
+                                                        quality, 
+                                                        quality_bar,
                                                         y_b_hat, 
-                                                        ms_base, 
+                                                        ms_base,
                                                         ms_progressive,
-                                                        mu, 
+                                                        mu,
                                                         scale,
-                                                        )
+                                                        training = False)
+
+
+
+            block_mask = self.masking(scale,
+                                        pr = quality, 
+                                        mask_pol = mask_pol) 
+
+
+
+            block_mask_bis = self.masking(scale,
+                                        pr = quality, 
+                                        mask_pol = mask_pol) 
+    
+
+    
+
+            diff_mask = block_mask - block_mask_bis
+            mubis = mu*diff_mask
+            stdmask = scale*diff_mask 
+
 
 
             
- 
-            #delete in case
-            block_mask =  self.masking(scale,pr = quality,mask_pol = mask_pol) # this is the q* in the original paper 
-            block_mask = self.masking.apply_noise(block_mask, False)
+
             
             index = self.gaussian_conditional.build_indexes(scale*block_mask)
             rv = self.gaussian_conditional.decompress(pr_strings, index).to(mu.device)

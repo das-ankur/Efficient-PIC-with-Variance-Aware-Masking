@@ -69,7 +69,7 @@ class ResidualBlock(nn.Module):
 class LatentRateReduction(nn.Module):
 
 
-        def __init__(self, dim_chunk = 32, mu_std = False, dimension = "middle" ):
+        def __init__(self, dim_chunk = 32, mu_std = True, dimension = "middle" ):
             super().__init__()
             self.dim_block = dim_chunk
 
