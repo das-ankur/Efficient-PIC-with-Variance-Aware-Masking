@@ -12,7 +12,11 @@ from .utils import extract_retrieve_entropy_parameters
 
 q_list = [0.002,0.05,0.5,0.75,1,1.5,2,2.5,3,4,5,5.5,6,6.6] 
 
-def encode(model, x_padded, save_path= None,rems = False,q_list = q_list):
+def encode(model, x_padded,
+           save_path= None,
+           rems = False,
+           q_list = q_list,
+           y_checkpoints = None):
 
 
     print("encode level base")
@@ -44,7 +48,7 @@ def encode(model, x_padded, save_path= None,rems = False,q_list = q_list):
                                         std_base,
                                         q_list,
                                         rems = rems,
-                                        y_checkpoint = None)
+                                        y_checkpoints = y_checkpoints)
 
     end_t = time.time()
     bitstreams["progressive"] = bitstreams_list 
@@ -67,7 +71,7 @@ def extract_all_bitsreams(model,
                           mu_base,
                           std_base, 
                           q_list,
-                          y_checkpoint = None, 
+                          y_checkpoints = None, 
                           rems = False):
 
 
@@ -87,7 +91,9 @@ def extract_all_bitsreams(model,
 
 
     y_slices = y.chunk(model.num_slices, 1)
-    y_checkpoint_hat = y_checkpoint.chunk(10,1) if y_checkpoint is not None else None #y_hat_base_slices  ###fff
+    if y_checkpoints is not None:
+        y_checkpoint_hat = [y.chunk(10,1) for y in y_checkpoints] #y_hat_base_slices  ###fff
+
 
 
     mu_base = mu_base.chunk(10,1)
@@ -103,7 +109,7 @@ def extract_all_bitsreams(model,
 
     for slice_index in range(model.ns0,model.ns1):
 
-        current_index = slice_index%model.ns0 #ddddddd
+        current_index = slice_index%model.ns0 
         y_slice = y_slices[slice_index]
         if model.delta_encode:
             r_slice = y_slice - y_slices[current_index]
@@ -117,7 +123,26 @@ def extract_all_bitsreams(model,
                                                             latent_means, 
                                                             latent_scales,
                                                             y_shape)
-
+        
+        if rems:
+            print("here I am checking if I need to apply rem anhancement")
+            assert len(y_checkpoints)== model.num_rems 
+            for j in range(len(y_checkpoints)):
+                
+                y_b_hat = y_checkpoint_hat[j][current_index]
+                ms_base = torch.cat([mu_base[current_index],std_base[current_index]],dim = 1) 
+                ms_progressive =  torch.cat([mu,scale],dim = 1) if model.mu_std else scale
+                y_b_hat.requires_grad = True
+                mu, scale = model.apply_latent_enhancement(current_index,
+                                                            model.check_levels[j] ,
+                                                            model.check_levels[j + 1] if j < model.num_rems - 1 else 10,
+                                                            y_b_hat, 
+                                                            ms_base, 
+                                                            ms_progressive,
+                                                            mu, 
+                                                            scale
+                                                            )
+           
         mu_total.append(mu_t)
         std_total.append(scale)
         mean.append(mu)
@@ -155,6 +180,8 @@ def extract_all_bitsreams(model,
         delta_mask_i = model.masking.ProgMask(scale_slices,q_init)#.ravel() #[10,320,h,w] of ones and zeros
         delta_mask_e = model.masking.ProgMask(scale_slices,q_end)#.ravel() #[320,h,w] of ones and zeros
 
+
+            
         
         
         delta_mask = delta_mask_e - delta_mask_i#.bool()
@@ -164,7 +191,7 @@ def extract_all_bitsreams(model,
         
         symbols_q = model.gaussian_conditional.compress(symbols_list,indexes_l,already_quantize = True)
         bpp_scale = sum(len(s) for s in symbols_q) * 8.0 
-        #print("lunghezza in bpp di ",j,": ",int(bpp_scale*num_pixels)," ",bpp_scale)
+        
         bits.append(bpp_scale)
         bitstream.append(symbols_q)
 

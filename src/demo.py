@@ -3,15 +3,12 @@ from test import parse_args_demo, read_and_pads_image, encode,  decode
 import time 
 import os
 import numpy as np
-from torch.utils.data import DataLoader
-from torchvision import transforms
-from dataset import TestKodakDataset
 from models import get_model
 from utility import sec_to_hours, compute_psnr
 import torch.nn.functional as F 
 import sys
-from training import ScalableRateDistortionLoss, RateDistortionLoss, DistortionLoss, RateLoss
-from training import compress_with_ac,test_epoch
+from training import compress_with_ac
+from models import VarianceMaskingPIC
 
 def main(argv):
 
@@ -33,6 +30,9 @@ def main(argv):
 
     print("initialization is over.")
     print("time for initialization is ",sec_to_hours(time.time() - start_t,rt = True))
+    
+    if isinstance(net, VarianceMaskingPIC):
+        args.rem = False
 
 
 
@@ -43,7 +43,7 @@ def main(argv):
 
     if args.fast_encdec:
 
-        print("perform different encoding and decoding for each quality. Faster solution with same results")
+        print("Perform different encoding/decoding for each quality. Faster solution with same results. But not single bitstream")
         pr_list = [0] + q_levs 
         mask_pol = "point-based-std"
         rems = None if args.rems is False else net.check_levels
@@ -60,6 +60,7 @@ def main(argv):
         print("done")  
 
     else:   
+        print("Progressive encoding/decoding activated")
         if args.requested_levels is None: 
             args.requested_levels = np.arange(1,len(q_levs))
         else:
@@ -81,8 +82,23 @@ def main(argv):
         print("start encoding following this q_list: ",ql) #ddd
         start_enc = time.time()
         with torch.no_grad():
+            if rems: 
+                y_checkpoints = []
+                print("find reference checkpoints!")
+                for lev in range(net.num_rems):
+                    assert lev in args.requested_levels
+                    checkpoint_rep = net.ExtractChekpointRepr(x_padded,
+                                                        quality = net.check_levels[lev],
+                                                        y_check = None if lev == 0  else checkpoint_rep)
+                    y_checkpoints.append(checkpoint_rep)
+                    
 
-            bitstreams,bits = encode(net, x_padded, save_path = save_path , q_list = q_levs,rems = args.rems)
+            bitstreams,bits = encode(net, 
+                                    x_padded, 
+                                    save_path = save_path ,
+                                    q_list = q_levs,
+                                    rems = args.rems,
+                                    y_checkpoints = y_checkpoints)
         end_enc = time.time()
         
         print("time for encoding: ",sec_to_hours(end_enc - start_enc,rt = True))
@@ -106,18 +122,25 @@ def main(argv):
         
 
 
-        y_hat_base = rec_hat_base["y_hat"]
+        
         z_data = None 
         entropy_data = None
+        y_checkpoints = None
+        
         for jj,qk in enumerate(args.requested_levels[1:]):
             start_dec_time = time.time()
             with torch.no_grad():
                 recs  = decode(net, 
                                bitstreams, 
                                q_ind = qk, 
-                               y_hat_base = y_hat_base,
+                               res_base = rec_hat_base,
                                z_data = z_data, 
-                               entropy_data= entropy_data)
+                               entropy_data= entropy_data,
+                               y_checkpoints=None if len(y_checkpoints) == 0 else y_checkpoints)
+                if qk in net.check_levels:
+                    y_checkpoints.append(recs["y_prog"])
+                    entropy_data = None 
+                    
             
 
             end_dec_time = time.time()

@@ -14,8 +14,7 @@ def decode_base(model, bits, latent_means, latent_scales, z_hat):
     scales_base = []
     mu_base = []
 
-    #print("tipe mean---> ",type(latent_means))
-    #print("tipe scale ---> ",type(latent_scales))
+
     for slice_index in range(model.ns0): #ddd
         pr_strings = y_string[slice_index]
         idx = slice_index%model.ns0 #.num_slice_cumulative_list[0]
@@ -59,11 +58,13 @@ def decode_base(model, bits, latent_means, latent_scales, z_hat):
 def decode(model, 
            bitstreams,  
            q_ind = 0, 
-           y_hat_base = None,
+           res_base = None,
            index_hat_slice = None,
            mean = None,
            z_data = None,
-           entropy_data = None
+           entropy_data = None,
+           y_checkpoints = None,
+           rems = False
            ):
 
     q_list = bitstreams["q_list"]
@@ -91,20 +92,29 @@ def decode(model,
 
     #print("in input che succede: ",type(latent_scales))
 
-    if y_hat_base is None:
+    if res_base is None:
         res_base = decode_base(model,base_string, latent_means, latent_scales, z_hat)
-        y_hat_base = res_base["y_hat"]
+
+    y_hat_base = res_base["y_hat"]
+    mu_base = res_base["mu"]
+    std_base = res_base["scale"]
+    
 
         
 
     if q_ind == 0:
         #print("y hat base shape: ",y_hat_base.shape)
         x_hat = model.g_s[0](y_hat_base).clamp_(0, 1) if model.multiple_decoder else model.g_s(y_hat_base).clamp_(0, 1)
-        return {"x_hat":x_hat,"y_hat":y_hat_base}
+        return {"x_hat":x_hat,"y_hat":y_hat_base,"mu":mu_base,"scale":std_base}
     
+    if y_checkpoints is not None:
+        y_checkpoint_hat = [y.chunk(10,1) for y in y_checkpoints] #y_hat_base_slices  ###fff
+
 
 
     y_hat_slices_base = y_hat_base.chunk(10,1)
+    mu_base = mu_base.chunk(10,1)
+    std_base = std_base.chunk(10,1)
 
     if entropy_data is None:
         indexes_slices = []
@@ -121,6 +131,25 @@ def decode(model,
                                                             latent_means, 
                                                             latent_scales,
                                                             y_shape)
+
+            if rems:
+                if y_checkpoints is not None: 
+                    for j in range(len(y_checkpoints)):
+                        
+                        y_b_hat = y_checkpoint_hat[j][current_index]
+                        ms_base = torch.cat([mu_base[current_index],std_base[current_index]],dim = 1) 
+                        ms_progressive =  torch.cat([mu,scale],dim = 1) if model.mu_std else scale
+                        y_b_hat.requires_grad = True
+                        mu, scale = model.apply_latent_enhancement(current_index,
+                                                                    model.check_levels[j] ,
+                                                                    model.check_levels[j + 1] if j < model.num_rems - 1 else 10,
+                                                                    y_b_hat, 
+                                                                    ms_base, 
+                                                                    ms_progressive,
+                                                                    mu, 
+                                                                    scale
+                                                                    )
+                    
 
             indexes_sl = model.gaussian_conditional.build_indexes(scale).int() #[1,32,h,w]
 
@@ -193,7 +222,11 @@ def decode(model,
     y_prog = torch.cat(y_prog,1).reshape(1,M,h,w)
 
     x_hat = model.g_s[1](y_prog ) if model.multiple_decoder else model.g_s(y_prog)
-    return {"x_hat": x_hat,"z_data":z_data,"entropy_data":entropy_data,"y_hat_base":y_hat_base}   
+    return {"x_hat": x_hat,
+            "z_data":z_data,
+            "entropy_data":entropy_data,
+            "y_hat_base":y_hat_base,
+            "y_prog":y_prog}   
 
 
 

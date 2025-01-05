@@ -40,11 +40,12 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
         
         self.dimension = dimension
         self.check_levels = check_levels 
+        self.num_rems = len(self.check_levels)
 
         self.enable_rem = [True for i in range(len(self.check_levels))] # we start with enabling rems
 
 
-        self.check_multiple = len(self.check_levels)
+        self.num_rems = len(self.check_levels)
         self.mu_std = mu_std#mu_std
 
 
@@ -52,7 +53,7 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
                                 nn.ModuleList( LatentRateReduction(dim_chunk = self.dim_chunk,
                                             mu_std = self.mu_std, dimension=dimension) 
                                             for _ in range(10))
-                                for _ in range(self.check_multiple)
+                                for _ in range(self.num_rems)
                                 )
 
 
@@ -117,35 +118,23 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
 
 
 
-    def ExtractChekpointRepr(self,x, quality,  rc = True): #fff
+    def ExtractChekpointRepr(self,x, quality,  rc = True, y_check = None): #fff
 
 
         out_latent = self.compress( x, 
                                    quality =quality,
                                     mask_pol ="point-based-std",
-                                    real_compress=rc) #["y_hat"] #ddd
+                                    real_compress=rc,
+                                    checkpoint_rep = y_check
+                                    ) #["y_hat"] #ddd
             
         #if quality == self.check_levels[0]:
         return out_latent["y_hat"]
             
-        out_latent_1 = self.compress( x, 
-                                quality =self.check_levels[1],
-                                mask_pol ="point-based-std",
-                                checkpoint_rep= out_latent["y_hat"],
-                                real_compress=rc)
-            
-        if quality == self.check_levels[1]:
-            return out_latent_1["y_hat"]
+
             
 
 
-        out_latent_2 = self.compress( x, 
-                                quality =self.check_levels[2],
-                                mask_pol ="point-based-std",
-                                checkpoint_rep= out_latent_1["y_hat"],
-                                real_compress=rc)
-            
-        return out_latent_2["y_hat"]
 
 
 
@@ -198,7 +187,7 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
                                     pr = quality,
                                     mask_pol = mask_pol) 
 
-            attention_mask = bar_mask 
+            attention_mask = star_mask #bar_mask 
             #print("number of zeros in the attention mask: ",torch.unique((attention_mask)))
             attention_mask = self.masking.apply_noise(attention_mask, training)   
 
@@ -208,9 +197,9 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
         if quality <= self.check_levels[0]: 
             return mu, scale         
 
-        if self.check_multiple == 1:
+        if self.num_rems == 1:
             enhanced_params =  self.post_latent[0][current_index](y_b_hat, mu_scale_base, mu_scale_enh, attention_mask)
-        elif self.check_multiple == 2:
+        elif self.num_rems == 2:
             index = 0 if self.check_levels[0] < quality <= self.check_levels[1] else 1 
             enhanced_params =  self.post_latent[index][current_index](y_b_hat, mu_scale_base, mu_scale_enh, attention_mask)
         else: 
@@ -230,46 +219,7 @@ class VarianceMaskingPICREM(VarianceMaskingPIC):
             scale = enhanced_params
             return mu, scale
 
-    """
-    def apply_latent_enhancement(self,
-                                current_index,
-                                right_index,
-                                block_mask,
-                                bar_mask,
-                                quality,
-                                y_b_hat, 
-                                mu_scale_base, 
-                                mu_scale_enh,
-                                mu, 
-                                scale,
-                                ):
 
-
-
-        #bar_mask =   self.masking(scale,pr = quality_bar,mask_pol = mask_pol) 
-        #star_mask = self.masking(scale,pr = quality,mask_pol = mask_pol)  
-
-        attention_mask = block_mask - bar_mask 
-        #attention_mask.requires_grad = True
- 
-        
-        if self.mu_std:
-            attention_mask = torch.cat([attention_mask,attention_mask],dim = 1)  
-
-        # in any case I do not improve anithing here!
-        if quality <= self.check_levels[0]: #  in case nothing has to be done dddd
-            return mu, scale         
-
-        enhanced_params =  self.post_latent[right_index][current_index](y_b_hat, mu_scale_base, mu_scale_enh, attention_mask)
-
-
-        if self.mu_std:
-                mu,scale = enhanced_params.chunk(2,1)
-                return mu, scale
-        else:
-            scale = enhanced_params
-            return mu, scale
-        """
 
 
 

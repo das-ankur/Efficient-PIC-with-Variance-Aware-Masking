@@ -88,8 +88,7 @@ python demo.py \
 --path_image #path-for-the-image-to-encode \ 
 --checkpoint #path-for-the-checkpoint \
 --rems # if-rems-activated \
---fast_encdec #for fast encoding/decoding \
 --path_save #path-where-to-save-results \
---model pic #type-of-model 
+--model pic #type-of-model
 --device cuda
 ```
