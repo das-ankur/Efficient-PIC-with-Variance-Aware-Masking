@@ -125,7 +125,7 @@ def main(argv):
         
         z_data = None 
         entropy_data = None
-        y_checkpoints = None
+        # y_checkpoints = None
         
         for jj,qk in enumerate(args.requested_levels[1:]):
             start_dec_time = time.time()
