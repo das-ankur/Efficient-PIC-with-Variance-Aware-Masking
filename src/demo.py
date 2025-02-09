@@ -81,9 +81,9 @@ def main(argv):
 
         print("start encoding following this q_list: ",ql) #ddd
         start_enc = time.time()
+        y_checkpoints = []
         with torch.no_grad():
             if rems: 
-                y_checkpoints = []
                 print("find reference checkpoints!")
                 for lev in range(net.num_rems):
                     assert lev in args.requested_levels
