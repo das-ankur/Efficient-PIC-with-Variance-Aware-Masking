@@ -38,6 +38,7 @@ def main(argv):
 
     save_path = args.save_path
     path_image = args.path_image
+    rems = None if args.rems is False else net.check_levels
 
 
 
@@ -46,7 +47,6 @@ def main(argv):
         print("Perform different encoding/decoding for each quality. Faster solution with same results. But not single bitstream")
         pr_list = [0] + q_levs 
         mask_pol = "point-based-std"
-        rems = None if args.rems is False else net.check_levels
         filelist = [os.path.join("/scratch/dataset/kodak",f) for f in os.listdir("/scratch/dataset/kodak")]#[path_image]
         bpp_image, psnr_image,_ = compress_with_ac(net, #net 
                                     filelist, 
